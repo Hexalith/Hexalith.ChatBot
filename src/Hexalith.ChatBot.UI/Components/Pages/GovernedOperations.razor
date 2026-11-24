@@ -59,9 +59,7 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
                                      StableId="governed-note-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"governed-note-failed-{UiText.FailureCatalogEntry(error).Code}-{FailureAnnouncementIdentity}")">
-                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
-                </ChatBotStatusBanner>
+                                     AnnouncementActivation="@State.Value.SubmissionActivation" />
             }
 
             @* UX "Page sections" rule (Story 13.7): the sibling titled MainContent regions group in one
@@ -453,12 +451,6 @@
     private string GovernedOperationsDescription
         => $"{UiText[ChatBotUiTextKey.GovernedOperationsIntro]} ui {UiText[ChatBotUiTextKey.GovernedOperationsIntroSuffix]}";
 
-    private int _failureSequence;
-    private readonly string _instanceId = Guid.NewGuid().ToString("N");
-
-    private string FailureAnnouncementIdentity => _failureSequence == 0
-        ? "initial" : $"{_instanceId}-{_failureSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-
     private void Submit()
     {
         // Guard the dispatch site: the reducer sets IsSubmitting before the effect runs, so the effect itself
@@ -468,7 +460,6 @@
             return;
         }
 
-        _failureSequence++;
         Dispatcher.Dispatch(new SubmitGovernedNoteAction());
     }
 

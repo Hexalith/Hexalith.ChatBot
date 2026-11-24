@@ -75,6 +75,10 @@
     [Parameter]
     public string? AnnouncementKey { get; set; }
 
+    /// <summary>Identifies a new user action for a stable announcement in this circuit.</summary>
+    [Parameter]
+    public long AnnouncementActivation { get; set; }
+
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
@@ -89,7 +93,7 @@
         ChatBotAnnouncementDedupRule repeatRule = _feedbackContract?.DedupRule ?? ChatBotAnnouncementDedupRule.OncePerStableOperationKey;
         _shouldAnnounceLiveRegion = LiveRegionPoliteness != ChatBotLiveRegionPoliteness.None &&
             ((_feedbackContract is null && !HasCatalogFailure)
-                || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule));
+                || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule, AnnouncementActivation));
     }
 
     private ChatBotLiveRegionPoliteness ResolvedPoliteness

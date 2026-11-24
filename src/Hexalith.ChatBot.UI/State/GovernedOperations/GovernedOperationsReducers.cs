@@ -12,7 +12,12 @@ public static class GovernedOperationsReducers
     public static GovernedOperationsState ReduceSubmit(GovernedOperationsState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return state with { IsSubmitting = true, Error = null };
+        return state with
+        {
+            IsSubmitting = true,
+            Error = null,
+            SubmissionActivation = state.SubmissionActivation + 1,
+        };
     }
 
     /// <summary>Records a successful outcome.</summary>

@@ -10,4 +10,8 @@ namespace Hexalith.ChatBot.UI.State.GovernedOperations;
 public sealed record GovernedOperationsState(
     bool IsSubmitting,
     OperationOutcome? Outcome,
-    string? Error);
+    string? Error)
+{
+    /// <summary>Gets the circuit's submission number so a failure stays tied to its initiating action.</summary>
+    public long SubmissionActivation { get; init; }
+}

@@ -108,32 +108,38 @@ public sealed class SafeOutcomeInteractionTests
     /// <summary>A fresh governed submission announces after navigation without re-announcing passive state.</summary>
     [Fact]
     public Task GovernedSubmissionShouldAnnounceAcrossRemount()
-        => RunAsync(async (renderer, dispatcher) =>
+    {
+        const string Failure = ChatBotMessageCodes.DependencyDegraded;
+        SafeOutcomeRenderState<GovernedOperationsState> state = new(new(false, null, Failure));
+        return RunAsync(async (renderer, dispatcher) =>
         {
-            HashSet<string> keys = [];
-            for (int mount = 0; mount < 2; mount++)
+            GovernedOperations page = await renderer.MountAsync<GovernedOperations>().ConfigureAwait(true);
+            await renderer.Dispatcher.InvokeAsync(async () =>
             {
-                GovernedOperations page = await renderer.MountAsync<GovernedOperations>().ConfigureAwait(true);
-                await renderer.Dispatcher.InvokeAsync(async () =>
+                ChatBotStatusBanner Banner() => renderer.Find<ChatBotStatusBanner>(page)
+                    .Single(item => item.StableId == "governed-note-failed");
+                string expectedKey = $"governed-note-failed-{Failure}";
+                renderer.Attribute(Banner(), "aria-live").ShouldBe("polite");
+                for (int attempt = 0; attempt < 2; attempt++)
                 {
-                    ChatBotStatusBanner banner = renderer.Find<ChatBotStatusBanner>(page)
-                        .Single(item => item.StableId == "governed-note-failed");
-                    renderer.Attribute(banner, "aria-live").ShouldBe(mount == 0 ? "polite" : "off");
-                    for (int attempt = 0; attempt < 2; attempt++)
-                    {
-                        ChatBotGovernedAction submit = renderer.Find<ChatBotGovernedAction>(page)
-                            .Single(item => item.StableId == "record-governed-note");
-                        await renderer.Find<FluentButton>(submit).Single().OnClick.InvokeAsync(new MouseEventArgs()).ConfigureAwait(true);
-                        keys.Add(renderer.Attribute(banner, "data-chatbot-announcement-key")!).ShouldBeTrue();
-                        renderer.Attribute(banner, "aria-live").ShouldBe("polite");
-                        renderer.Attribute(banner, "data-chatbot-live-announced").ShouldBe("true");
-                        await renderer.UpdateAsync(page, []).ConfigureAwait(true);
-                        renderer.Attribute(banner, "aria-live").ShouldBe("off");
-                    }
-                }).ConfigureAwait(true);
-            }
-            dispatcher.Actions.OfType<SubmitGovernedNoteAction>().Count().ShouldBe(4);
-        });
+                    ChatBotGovernedAction submit = renderer.Find<ChatBotGovernedAction>(page)
+                        .Single(item => item.StableId == "record-governed-note");
+                    await renderer.Find<FluentButton>(submit).Single().OnClick.InvokeAsync(new MouseEventArgs()).ConfigureAwait(true);
+                    state.Value = GovernedOperationsReducers.ReduceSubmit(state.Value);
+                    await renderer.UpdateAsync(page, []).ConfigureAwait(true);
+                    page = await renderer.MountAsync<GovernedOperations>().ConfigureAwait(true);
+                    state.Value = GovernedOperationsReducers.ReduceFailed(state.Value, new(Failure));
+                    await renderer.UpdateAsync(page, []).ConfigureAwait(true);
+
+                    renderer.Attribute(Banner(), "data-chatbot-announcement-key").ShouldBe(expectedKey);
+                    renderer.Attribute(Banner(), "data-chatbot-live-announced").ShouldBe("true");
+                    page = await renderer.MountAsync<GovernedOperations>().ConfigureAwait(true);
+                    renderer.Attribute(Banner(), "aria-live").ShouldBe("off");
+                }
+            }).ConfigureAwait(true);
+            dispatcher.Actions.OfType<SubmitGovernedNoteAction>().Count().ShouldBe(2);
+        }, governedState: state);
+    }
 
     /// <summary>A new composer instance can announce a same-code submission in the same circuit.</summary>
     [Fact]
@@ -243,7 +249,8 @@ public sealed class SafeOutcomeInteractionTests
             }).ConfigureAwait(true);
         });
 
-    private static async Task RunAsync(Func<SafeOutcomeInteractiveRenderer, SafeOutcomeRenderDispatcher, Task> test, string culture = "en", string? dashboardError = ChatBotMessageCodes.DependencyDegraded)
+    private static async Task RunAsync(Func<SafeOutcomeInteractiveRenderer, SafeOutcomeRenderDispatcher, Task> test, string culture = "en", string? dashboardError = ChatBotMessageCodes.DependencyDegraded,
+        SafeOutcomeRenderState<GovernedOperationsState>? governedState = null)
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
@@ -258,7 +265,8 @@ public sealed class SafeOutcomeInteractionTests
             services.AddSingleton<Hexalith.ChatBot.Client.IChatBotClient>(new FakeChatBotClient());
             services.AddSingleton<IState<ProjectConversationState>>(new SafeOutcomeRenderState<ProjectConversationState>(new(false, null, ChatBotMessageCodes.AuditUnavailable)));
             services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(new(false, null, dashboardError)));
-            services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
+            services.AddSingleton<IState<GovernedOperationsState>>(governedState
+                ?? new SafeOutcomeRenderState<GovernedOperationsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
             SafeOutcomeRenderDispatcher dispatcher = new();
             services.AddSingleton<IDispatcher>(dispatcher);
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));

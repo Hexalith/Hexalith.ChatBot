@@ -8,7 +8,7 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 internal sealed class SafeOutcomeRenderState<T>(T value) : IState<T> where T : class
 {
     /// <inheritdoc/>
-    public T Value { get; } = value;
+    public T Value { get; set; } = value;
 
     /// <inheritdoc/>
     public event EventHandler? StateChanged
