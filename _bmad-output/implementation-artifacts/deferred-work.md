@@ -1081,7 +1081,8 @@ triage: 2026-11-24 Skipped. The existing localized catalog and generic fallback 
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: `.chatbot-conversation-shell` hand-rolled chrome still wraps the `FcPageLayout`/`FcPageHeader` composition. `chatbot.tokens.css:59-99` forces `display:grid` on `__body`, which is a `FluentStack Orientation="Horizontal"` supplying its own flex layout, so the `@media (min-width:900px)` `grid-template-columns` rule at :279-283 is fragile or inert; `Wrap` is left `false` so main and complementary cannot wrap at phone width; and the shell caps at `70rem` while content declares `FcPageLayoutMode.FullWidth`. Pre-existing — the Epic 13 application frame is Story 13.1 (`done`).
-status: open
+status: done 2026-11-24
+resolution: FluentStack owns outer spacing and responsive wrapping. The conversation has no fixed width cap, and Chromium checks the main and complementary regions at desktop and narrow widths.
 decision: 2026-08-27 Adopt FrontComposer layout — Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.
 decision: 2026-08-26 Adopt FrontComposer layout — Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.
 

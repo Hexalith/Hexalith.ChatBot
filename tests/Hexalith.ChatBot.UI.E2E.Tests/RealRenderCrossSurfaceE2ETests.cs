@@ -44,6 +44,40 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
     private const string FrCulture = "fr";
     private const int ShellHeaderBandPx = 48;
 
+    [Theory]
+    [InlineData(420, true)]
+    [InlineData(1440, false)]
+    public async Task ConversationShellShouldWrapTheComplementaryRegionAtNarrowWidths(int width, bool stacked)
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+        await OpenAsync(page, Surfaces[2], EnCulture, ColorModes[0], width, 900);
+
+        // Read a single connected render so the boxes cannot come from different Blazor render batches.
+        await page.WaitForFunctionAsync(
+            """
+            stacked => {
+                const body = document.querySelector('.chatbot-conversation-shell__body');
+                const main = body?.querySelector(':scope > section[role="region"]');
+                const panel = body?.querySelector(':scope > aside[role="complementary"]');
+                if (!main || !panel || getComputedStyle(body).flexWrap !== 'wrap') return false;
+
+                const bounds = body.getBoundingClientRect();
+                const primary = main.getBoundingClientRect();
+                const complementary = panel.getBoundingClientRect();
+                if (primary.width <= 0 || complementary.width <= 0 ||
+                    primary.right > bounds.right + 1 || complementary.right > bounds.right + 1) return false;
+
+                return stacked
+                    ? complementary.top >= primary.bottom
+                    : complementary.left >= primary.right && Math.abs(complementary.top - primary.top) <= 1;
+            }
+            """,
+            stacked);
+    }
+
     [Fact]
     public async Task ProjectConversation_LoadOlderMergesHistoryWithoutReplacingNewestContent()
     {

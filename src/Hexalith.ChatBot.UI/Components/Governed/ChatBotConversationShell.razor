@@ -1,16 +1,17 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-<section class="chatbot-conversation-shell"
-         aria-label="@ResolvedShellLabel"
-         data-chatbot-focus-sequence="project-context-primary-complementary">
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem" Class="chatbot-conversation-shell"
+             role="region" aria-label="@ResolvedShellLabel"
+             data-chatbot-focus-sequence="project-context-primary-complementary">
     @if (ProjectContext is not null)
     {
         <FluentStack Orientation="Orientation.Vertical" Class="chatbot-conversation-shell__context">
             @ProjectContext
         </FluentStack>
     }
-    <FluentStack Orientation="Orientation.Horizontal" Class="chatbot-conversation-shell__body">
+    <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="0.75rem" VerticalGap="0.75rem"
+                 VerticalAlignment="VerticalAlignment.Top" Class="chatbot-conversation-shell__body">
         <section class="chatbot-conversation-shell__main" role="region" aria-label="@ResolvedMainLabel">
             @MainContent
         </section>
@@ -21,7 +22,7 @@
             </aside>
         }
     </FluentStack>
-</section>
+</FluentStack>
 
 @code {
     [Parameter]

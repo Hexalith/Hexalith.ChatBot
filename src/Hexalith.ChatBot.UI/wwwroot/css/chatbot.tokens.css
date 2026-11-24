@@ -58,8 +58,6 @@ body {
 
 .chatbot-section,
 .chatbot-status-group,
-.chatbot-conversation-shell,
-.chatbot-conversation-shell__body,
 .chatbot-project-context-header,
 .chatbot-labelled-row-list,
 .chatbot-audit-list,
@@ -98,8 +96,19 @@ body {
     min-width: 0;
 }
 
-.chatbot-conversation-shell {
-    max-width: min(100%, 70rem);
+.chatbot-conversation-shell,
+.chatbot-conversation-shell__body,
+.chatbot-conversation-shell__main,
+.chatbot-conversation-shell__panel {
+    min-inline-size: 0;
+}
+
+.chatbot-conversation-shell__main {
+    flex: 3 1 30rem;
+}
+
+.chatbot-conversation-shell__panel {
+    flex: 1 1 18rem;
 }
 
 /* .chatbot-streaming-status carries AC4's requirement that generation progress is conveyed by visible text and never
@@ -282,12 +291,6 @@ body {
 .chatbot-ai-action-preview__section:focus-visible {
     outline: 2px solid var(--colorStrokeFocus2);
     outline-offset: 2px;
-}
-
-@media (min-width: 900px) {
-    .chatbot-conversation-shell__body:has(.chatbot-conversation-shell__panel) {
-        grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-    }
 }
 
 @media (min-width: 600px) {

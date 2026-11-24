@@ -161,7 +161,6 @@ public sealed class ChatBotResponsiveTouchContractTests
         css.ShouldContain(".chatbot-labelled-row");
         css.ShouldContain("overflow-wrap: anywhere;");
         css.ShouldContain("@media (max-width: 599px)");
-        css.ShouldContain("@media (min-width: 900px)");
         css.ShouldNotContain("user-scalable=no", Case.Insensitive);
 
         app.ShouldContain("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />");
