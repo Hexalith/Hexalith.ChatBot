@@ -2280,3 +2280,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-builds-catalog-consumer-authority-completeness.md`
   summary: Hexalith.Builds `docs/dotnet-11-migration.md:34` still says CommunityToolkit.Aspire.Hosting.Dapr "is 17.0.0-beta.1052", in present tense, but the catalog selects 17.0.0-preview.1.261120-0454.
   evidence: The sentence sits under "Retained compatibility" and was already stale at Builds 27fe4d62, after the catalog moved through beta.1078 to the preview build. The Builds catalog consumer-authority change edited only the next two lines of that bullet. Fix it by putting the sentence in past tense or by naming the current selection.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch.md`
+  summary: Verify that the nightly release hook executes both required release checks.
+  evidence: The minimum discovery count rejects an empty run, but one surviving test can satisfy it if discovery loses the M2 or origin-parity check. The two required identities are declared in `tests/Hexalith.ChatBot.Release.Tests/GovernedStateReleaseGateTests.cs`.
