@@ -2781,6 +2781,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             context.EnvironmentVariables["Authentication__JwtBearer__Issuer"] = MemoriesProbeIssuer;
             context.EnvironmentVariables["Authentication__JwtBearer__Audience"] = MemoriesProbeAudience;
             context.EnvironmentVariables["Authentication__JwtBearer__SigningKey"] = MemoriesProbeSigningKey;
+            context.EnvironmentVariables["Authentication__JwtBearer__ValidAlgorithms__0"] = "HS256";
         }));
         // Live topology uses Keycloak owner client credentials. Overlaying ChatBot__Memories__ApiToken
         // mixes a static token with OwnerAuthentication and ChatBot refuses to start.
