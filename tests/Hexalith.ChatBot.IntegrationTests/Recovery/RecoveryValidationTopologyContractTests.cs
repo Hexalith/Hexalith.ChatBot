@@ -593,13 +593,40 @@ public sealed class RecoveryValidationTopologyContractTests
         finally
         {
             await builder.DisposeAsync().ConfigureAwait(true);
-            if (generatedDirectory is not null)
-            {
-                Directory.Delete(generatedDirectory, recursive: true);
-            }
         }
     }
 
+
+    [Fact]
+    public void DisposingTheRealmImportReleasesItsClaimAndRemovesTheDirectory()
+    {
+        string directory = Directory.CreateTempSubdirectory("hexalith-realm-lease-test-").FullName;
+        using (KeycloakRealmImport realm = new(directory))
+        {
+            realm.Claim();
+            Directory.Exists(realm.DirectoryPath).ShouldBeTrue();
+            KeycloakRealmOwner.CanReclaim(realm.DirectoryPath).ShouldBeFalse();
+        }
+
+        Directory.Exists(directory).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task FailedAppHostCompositionReleasesTheRenderedRealm()
+    {
+        string secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string[] args = [.. RenderedRealmArgs, "--ChatBot:Projects:OwnerAuthentication:Mode=invalid"];
+        args[0] = $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={secret}";
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder.CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(
+                args, TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        exception.Message.ShouldContain("complete static tokens without mixed client credentials");
+        Directory.EnumerateDirectories(Path.GetTempPath(), "hexalith-chatbot-keycloak-*")
+            .Any(directory => RenderedRealmContains(directory, secret))
+            .ShouldBeFalse("a composition failure after realm generation must release its rendered file");
+    }
 
     [Fact]
     public async Task PrepareKeycloakRealmImportSweepsAbandonedRealmDirectoriesAndSparesLiveOnes()
@@ -654,7 +681,7 @@ public sealed class RecoveryValidationTopologyContractTests
         finally
         {
             await builder.DisposeAsync().ConfigureAwait(true);
-            foreach (string? directory in new[] { generatedDirectory, live, abandoned, unreadable, legacy, markerless })
+            foreach (string? directory in new[] { live, abandoned, unreadable, legacy, markerless })
             {
                 if (directory is not null && Directory.Exists(directory))
                 {
@@ -926,10 +953,6 @@ public sealed class RecoveryValidationTopologyContractTests
         finally
         {
             await builder.DisposeAsync().ConfigureAwait(true);
-            if (generatedDirectory is not null && Directory.Exists(generatedDirectory))
-            {
-                Directory.Delete(generatedDirectory, recursive: true);
-            }
         }
     }
 

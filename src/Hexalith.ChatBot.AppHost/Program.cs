@@ -51,7 +51,7 @@ string projectsAuthorityReadPublicKey = Convert.ToBase64String(projectsAuthority
 using RSA memoriesCommandKey = RSA.Create(2048);
 string memoriesCommandPrivateKey = Convert.ToBase64String(memoriesCommandKey.ExportPkcs8PrivateKey());
 string memoriesCommandPublicKey = Convert.ToBase64String(memoriesCommandKey.ExportSubjectPublicKeyInfo());
-string realmImportPath = PrepareKeycloakRealmImport(
+using KeycloakRealmImport realmImport = PrepareKeycloakRealmImport(
     builder.AppHostDirectory,
     builder.Configuration,
     eventStoreWorkloadClientSecret,
@@ -62,7 +62,7 @@ string realmImportPath = PrepareKeycloakRealmImport(
     projectsAuthorityReaderSecret,
     [projectsOwner, memoriesOwner]);
 HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity(
-    new HexalithEventStoreSecurityOptions { RealmImportPath = realmImportPath });
+    new HexalithEventStoreSecurityOptions { RealmImportPath = realmImport.DirectoryPath });
 IResourceBuilder<ParameterResource> eventStoreWorkloadClientSecretParameter = builder.AddParameter(
     "eventstore-workload-client-secret",
     () => eventStoreWorkloadClientSecret,
@@ -410,7 +410,7 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 // to start the topology against a grant that is already expired or close to it, which is the failure mode a stale
 // checked-in realm actually produces. Production provisioning and rotation of service-client grants live outside
 // this AppHost, in deployment configuration; do not add them here. See README.md#local-development-seed-credential-policy.
-static string PrepareKeycloakRealmImport(
+static KeycloakRealmImport PrepareKeycloakRealmImport(
     string appHostDirectory,
     IConfiguration configuration,
     string eventStoreWorkloadClientSecret,
@@ -604,13 +604,7 @@ static string PrepareKeycloakRealmImport(
     realm = realm.Replace(projectsAuthorityReaderSecretPlaceholder, projectsAuthorityReaderSecret, StringComparison.Ordinal);
     realm = PlatformOwnerServices.AppendOwnerClientsToRealm(realm, ownerClients);
 
-    // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
-    // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a
-    // disk-accumulation gap, not a confidentiality one). Sweep leftovers before creating this run's directory rather
-    // than only at exit.
-    //
-    // Each live owner holds an open marker on the shared filesystem for the lifetime of its realm.
-    // This keeps a concurrent AppHost from reclaiming it across process and PID-namespace boundaries.
+    // Sweep directories abandoned by a hard stop. A live owner holds an open marker across PID namespaces.
     SweepAbandonedKeycloakRealmDirectories();
 
     // Created 0700 by CreateTempSubdirectory rather than 0755-then-chmod, and with a random name rather than the
@@ -621,53 +615,44 @@ static string PrepareKeycloakRealmImport(
     // under another owner failed topology startup outright.
     string generatedDirectory = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
     string generatedRealmPath = Path.Combine(generatedDirectory, "hexalith-realm.json");
-    FileStream? realmOwner = KeycloakRealmOwner.Claim(generatedDirectory);
-
-    // This rendered realm is the only artifact that carries a literal client secret, so it must never exist at
-    // world-readable permissions even briefly, and it must not outlive the process that needed it. CreateNew makes the
-    // write fail rather than follow a pre-existing path, and UnixCreateMode applies the mode at creation.
-    FileStreamOptions realmFileOptions = new()
+    KeycloakRealmImport import = new(generatedDirectory);
+    try
     {
-        Mode = FileMode.CreateNew,
-        Access = FileAccess.Write,
-        Share = FileShare.None,
-    };
-    if (!OperatingSystem.IsWindows())
-    {
-        realmFileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-    }
-
-    using (StreamWriter realmWriter = new(new FileStream(generatedRealmPath, realmFileOptions)))
-    {
-        realmWriter.Write(realm);
-    }
-
-    if (OperatingSystem.IsWindows())
-    {
-        // UnixCreateMode has no Windows equivalent, so the file above was created inheriting the temp directory's
-        // ACL, which is not necessarily owner-only on a shared build host. Apply an explicit owner-only ACL so the
-        // client secret embedded in this rendered realm cannot be read by another account.
-        ApplyWindowsRealmFileAcl(generatedRealmPath);
-    }
-
-    AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-    {
-        realmOwner?.Dispose();
-        try
+        import.Claim();
+        // This rendered realm is the only artifact that carries a literal client secret, so it must never exist at
+        // world-readable permissions even briefly, and it must not outlive the process that needed it. CreateNew makes the
+        // write fail rather than follow a pre-existing path, and UnixCreateMode applies the mode at creation.
+        FileStreamOptions realmFileOptions = new()
         {
-            Directory.Delete(generatedDirectory, recursive: true);
-        }
-        catch (IOException)
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
+        if (!OperatingSystem.IsWindows())
         {
-            // Best effort: a locked or already-removed directory must never fail the topology teardown.
+            realmFileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         }
-        catch (UnauthorizedAccessException)
-        {
-            // Same rationale as above.
-        }
-    };
 
-    return generatedDirectory;
+        using (StreamWriter realmWriter = new(new FileStream(generatedRealmPath, realmFileOptions)))
+        {
+            realmWriter.Write(realm);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            // UnixCreateMode has no Windows equivalent, so the file above was created inheriting the temp directory's
+            // ACL, which is not necessarily owner-only on a shared build host. Apply an explicit owner-only ACL so the
+            // client secret embedded in this rendered realm cannot be read by another account.
+            ApplyWindowsRealmFileAcl(generatedRealmPath);
+        }
+
+        return import;
+    }
+    catch
+    {
+        import.Dispose();
+        throw;
+    }
 }
 
 // Counts the realm clients that declare a service-client grant-expiry protocol mapper, and fails NAMING the client

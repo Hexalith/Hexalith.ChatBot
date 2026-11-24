@@ -344,7 +344,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: AppHost hygiene
 severity: low
 reason: **[LOW · AppHost cleanup] Temp realm cleanup is only on `AppDomain.ProcessExit`.** Kill/crash can leave the secret-bearing realm under the shared temp root. **Release-claim impact:** local shared-host residual only. **Owner:** AppHost hygiene. **Closure evidence:** `IHostApplicationLifetime` / dispose path that always deletes the generated directory.
-status: open
+status: done 2026-11-24
+resolution: The AppHost owns the rendered realm through a disposable filesystem claim. Scope exit and composition failure release it, and startup still sweeps recognized abandoned directories after hard stops.
 
 ### DW-38: [LOW · sandbox fixture] Committed Keycloak realm includes `recovery-validator` / `recovery-validator-pass`.
 
