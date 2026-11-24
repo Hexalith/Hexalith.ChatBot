@@ -282,6 +282,35 @@ public sealed class AspireRecoveryCleanupStateTests
         AssertEventStoreEmpty(operations.ActiveEventStoreCleanupState);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("invalid")]
+    public async Task EventStoreCheckpointRejectsMissingOrInvalidPersistedTimestamp(string? timestamp)
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        RecoverySandboxOperationsTestSeam seam = SandboxSeam(submit: async (note, _, _, _, _, cancellationToken) =>
+        {
+            await store.SaveAsync(
+                ChatBotReadModelStoreNames.StateStoreName,
+                GovernedKey(tenant, note),
+                Governed(tenant, note),
+                cancellationToken).ConfigureAwait(false);
+            handler.AddGovernedNote(tenant, note, timestamp);
+        });
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        AspireRecoverySandboxOperations operations = SandboxOperations(seam, store, durable);
+
+        InvalidOperationException error = await Should.ThrowAsync<InvalidOperationException>(() => operations
+            .SeedCommittedOperationAsync(RecoveryValidationTopology.LogicalTenantRef, Id8, TestContext.Current.CancellationToken)
+            .AsTask());
+
+        error.Message.ShouldContain("EventStore event state");
+        operations.ActiveEventStoreCleanupState.CheckpointNoteRefs.ShouldHaveSingleItem();
+        operations.ActiveEventStoreCleanupState.CheckpointCommittedAtUtc.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task IncompleteEventStoreCleanupAllowsFreshSeedingAndCleanup()
     {
@@ -416,10 +445,12 @@ public sealed class AspireRecoveryCleanupStateTests
         InMemoryRecoveryReadModelStore store = new();
         RecoveryDurableStateMessageHandler handler = new();
         List<string> diagnostics = [];
+        Queue<string> checkpointTimestamps = new(["2026-08-01T00:01:00Z", "2026-08-01T00:03:00Z", "2026-08-01T00:02:00Z"]);
         RecoverySandboxOperationsTestSeam seam = SandboxSeam(
             submit: async (note, _, _, _, token, cancellationToken) =>
             {
-                string tenant = string.Equals(token, "control", StringComparison.Ordinal)
+                bool controlTenant = string.Equals(token, "control", StringComparison.Ordinal);
+                string tenant = controlTenant
                     ? RecoveryValidationTopology.ControlTenantRef
                     : RecoveryValidationTopology.StorageTenantRef;
                 await store.SaveAsync(
@@ -427,7 +458,7 @@ public sealed class AspireRecoveryCleanupStateTests
                     GovernedKey(tenant, note),
                     Governed(tenant, note),
                     cancellationToken).ConfigureAwait(false);
-                handler.AddGovernedNote(tenant, note);
+                handler.AddGovernedNote(tenant, note, controlTenant ? "2026-08-01T00:04:00Z" : checkpointTimestamps.Dequeue());
             },
             diagnostic: (value, _) =>
             {
@@ -436,10 +467,12 @@ public sealed class AspireRecoveryCleanupStateTests
             });
         using EventStoreDurableStateProbe durable = Durable(handler);
         AspireRecoverySandboxOperations operations = SandboxOperations(seam, store, durable);
-        _ = await operations.SeedCommittedOperationAsync(
+        RecoveryOperationCheckpoint checkpoint = await operations.SeedCommittedOperationAsync(
             RecoveryValidationTopology.LogicalTenantRef,
             Id8,
             TestContext.Current.CancellationToken);
+        checkpoint.CommittedCount.ShouldBe(3);
+        checkpoint.LastCommittedAtUtc.ShouldBe(new DateTimeOffset(2026, 8, 1, 0, 3, 0, TimeSpan.Zero));
         List<string> checkpoints = [.. operations.ActiveEventStoreCleanupState.CheckpointNoteRefs];
         string control = operations.ActiveEventStoreCleanupState.ControlTenantNoteRef!;
         string fault = Id7;
@@ -794,6 +827,46 @@ public sealed class AspireRecoveryCleanupStateTests
         restores[0].GetProperty("current").GetProperty("submitted").GetInt32().ShouldBe(2);
         processed.ShouldBe(secondCycle == "missing" ? new[] { Id1, Id2, Id3 } : new[] { Id1, Id2, Id3, Id4 });
         handler.Requests.ShouldContain(request => request.TenantRef == tenant && request.AggregateRef == Id3);
+    }
+
+    [Fact]
+    public async Task SubscriptionCheckpointUsesPersistedTimestamp()
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        handler.AddMailboxIntake(tenant, Id1, "2026-08-01T00:01:00Z");
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        AspireRecoverySandboxOperations operations = SandboxOperations(
+            SandboxSeam(responses: new Queue<string>([Process(Id1, Id1)])), store, durable);
+
+        RecoveryOperationCheckpoint checkpoint = await operations.CheckpointSubscriptionCommittedBoundAsync(
+            RecoveryValidationTopology.LogicalTenantRef, Id8, TestContext.Current.CancellationToken);
+
+        checkpoint.ShouldBe(new RecoveryOperationCheckpoint(1, new DateTimeOffset(2026, 8, 1, 0, 1, 0, TimeSpan.Zero), Id1));
+        operations.ActiveSubscriptionCleanupState.SubscriptionCheckpointIntakeRef.ShouldBe(Id1);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("invalid")]
+    public async Task SubscriptionCheckpointRejectsMissingOrInvalidPersistedTimestamp(string? timestamp)
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        handler.AddMailboxIntake(tenant, Id1, timestamp);
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        AspireRecoverySandboxOperations operations = SandboxOperations(
+            SandboxSeam(responses: new Queue<string>([Process(Id1, Id1)])), store, durable);
+
+        InvalidOperationException error = await Should.ThrowAsync<InvalidOperationException>(() => operations
+            .CheckpointSubscriptionCommittedBoundAsync(RecoveryValidationTopology.LogicalTenantRef, Id8, TestContext.Current.CancellationToken)
+            .AsTask());
+
+        error.Message.ShouldContain("EventStore event state");
+        operations.ActiveSubscriptionCleanupState.SubscriptionCheckpointIntakeRef.ShouldBeNull();
+        operations.ActiveSubscriptionCleanupState.StorageIntakeRefs.ShouldContain(Id1);
     }
 
     [Theory]

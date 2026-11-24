@@ -75,6 +75,7 @@ location: existing NFR41 / evidence-integrity residual
 severity: medium
 reason: **[MEDIUM · NFR41]** Identity/Graph scope stamps still minted via post-hoc `/scope-observation`. Reconfirmed on ops-harness chunk. **Release-claim impact:** NFR41 figures remain provisional (sandbox self-timing). **Owner:** existing NFR41 / evidence-integrity residual. **Closure evidence:** honest product monitoring clocks or explicit unmeasurable.
 status: open
+triage: 2026-11-24 Skipped. A Graph/Identity subset of DW-45. Product monitoring observations are unavailable on the scoped-outage lane.
 
 ### DW-9: [MEDIUM · RPO bound] Continuity `LastCommittedAtUtc` is harness `UtcNow` after projection wait, not an EventStore commit stamp. Entangled with green-path Zero-RPO residual.
 
@@ -82,7 +83,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 RPO measurement honesty
 severity: medium
 reason: **[MEDIUM · RPO bound]** Continuity `LastCommittedAtUtc` is harness `UtcNow` after projection wait, not an EventStore commit stamp. Entangled with green-path Zero-RPO residual. **Release-claim impact:** loss-path RPO bounds inherit wall-clock distortion. **Owner:** Story 12.15 RPO measurement honesty. **Closure evidence:** durable commit stamp or documented non-citability of harness-clock bounds.
-status: open
+status: done 2026-11-24
+resolution: Both continuity checkpoint drivers use EventStore envelope timestamps from the successful authoritative poll. Tests distinguish the durable clocks from sandbox and harness times and reject missing or malformed timestamps.
 
 ### DW-10: [LOW · contract tests] Ops-harness contract tests omit route/lane/composer guards.
 

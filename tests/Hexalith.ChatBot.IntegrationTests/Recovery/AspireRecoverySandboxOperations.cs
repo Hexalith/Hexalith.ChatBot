@@ -204,11 +204,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                     RecoveryValidationTopology.StorageTenantRef,
                     cancellationToken)
                 .ConfigureAwait(false);
-            await _durableState.WaitForGovernedNoteAsync(
+            DurableCommitObservation observation = await _durableState.WaitForGovernedNoteCommitAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 noteRef,
                 cancellationToken).ConfigureAwait(false);
-            _eventStoreCleanupState.CheckpointCommittedAtUtc.Add(UtcNow);
+            _eventStoreCleanupState.CheckpointCommittedAtUtc.Add(observation.CommittedAtUtc);
         }
 
         // Seed a resource owned by an INDEPENDENT control tenant. Probing a randomly generated id with the caller's
@@ -824,19 +824,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             throw new InvalidOperationException(
                 "Subscription committed-before-outage checkpoint did not return both contract identities.");
         }
-        if (!root.TryGetProperty("observedAtUtc", out JsonElement observed))
-        {
-            throw new InvalidOperationException(
-                "Subscription committed-before-outage checkpoint did not return observedAtUtc.");
-        }
 
-        await _durableState.WaitForMailboxIntakeAsync(
+        DurableCommitObservation observation = await _durableState.WaitForMailboxIntakeCommitAsync(
             RecoveryValidationTopology.StorageTenantRef,
             intakeId,
             cancellationToken).ConfigureAwait(false);
         _subscriptionCleanupState.SubscriptionCheckpointIntakeRef = intakeId;
-        DateTimeOffset committedAtUtc = observed.GetDateTimeOffset().ToUniversalTime();
-        return new RecoveryOperationCheckpoint(1, committedAtUtc, intakeId);
+        return new RecoveryOperationCheckpoint(1, observation.CommittedAtUtc, intakeId);
     }
 
     /// <summary>Produces and reads one authoritative durable bound for the controlled-loss lane.</summary>

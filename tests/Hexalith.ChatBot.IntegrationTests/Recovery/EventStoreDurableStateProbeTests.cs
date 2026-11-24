@@ -55,10 +55,38 @@ public sealed class EventStoreDurableStateProbeTests
         using CancellationTokenSource testDeadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         testDeadline.CancelAfter(TimeSpan.FromSeconds(5));
 
-        await probe.WaitForMailboxIntakeAsync(
+        DurableCommitObservation observation = await probe.WaitForMailboxIntakeCommitAsync(
             "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", testDeadline.Token);
 
         handler.Requests.ShouldBe(3);
+        observation.CommittedAtUtc.ShouldBe(new DateTimeOffset(2026, 8, 28, 0, 1, 0, TimeSpan.Zero));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CommitWaitReturnsTheFirstDurableObservationWithoutReadingAgain(bool governedNote)
+    {
+        const string tenant = "recovery-validation";
+        const string aggregate = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        string eventBody = governedNote
+            ? EventEnvelope(tenant, "Hexalith.ChatBot.Contracts.Events.GovernedNoteRecorded")
+            : EventEnvelope(tenant);
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber switch
+        {
+            1 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
+            2 => SequenceHttpMessageHandler.Json(eventBody),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        });
+        using EventStoreDurableStateProbe probe = new(Endpoint, handler, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(5));
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        DurableCommitObservation observation = governedNote
+            ? await probe.WaitForGovernedNoteCommitAsync(tenant, aggregate, cancellationToken)
+            : await probe.WaitForMailboxIntakeCommitAsync(tenant, aggregate, cancellationToken);
+
+        handler.Requests.ShouldBe(2);
+        observation.CommittedAtUtc.ShouldBe(new DateTimeOffset(2026, 8, 28, 0, 1, 0, TimeSpan.Zero));
     }
 
     [Fact]
@@ -317,6 +345,8 @@ public sealed class EventStoreDurableStateProbeTests
     [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":2,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"2026-08-28T00:01:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
     [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"not-a-ulid\",\"timestamp\":\"2026-08-28T00:01:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
     [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"2026-08-28T02:01:00+02:00\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"0001-01-01T00:00:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"9999-01-01T00:00:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
     public async Task MissingMalformedOrMismatchedDurableBoundsFailClosed(string eventBody)
     {
         using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber == 1
@@ -334,8 +364,10 @@ public sealed class EventStoreDurableStateProbeTests
             TestContext.Current.CancellationToken));
     }
 
-    private static string EventEnvelope(string tenantRef)
+    private static string EventEnvelope(
+        string tenantRef,
+        string eventTypeName = "Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured")
         => $$"""
-            {"tenantId":"{{tenantRef}}","domain":"chatbot","aggregateId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","sequenceNumber":1,"messageId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","timestamp":"2026-08-28T00:01:00Z","eventTypeName":"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured"}
+            {"tenantId":"{{tenantRef}}","domain":"chatbot","aggregateId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","sequenceNumber":1,"messageId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","timestamp":"2026-08-28T00:01:00Z","eventTypeName":"{{eventTypeName}}"}
             """;
 }

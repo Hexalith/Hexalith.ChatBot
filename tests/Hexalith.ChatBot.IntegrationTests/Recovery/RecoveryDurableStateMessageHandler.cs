@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 
@@ -8,7 +9,8 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 internal sealed class RecoveryDurableStateMessageHandler : HttpMessageHandler
 {
     private const string EventMessageId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-    private readonly ConcurrentDictionary<string, string> _presentAggregates = new(StringComparer.Ordinal);
+    private const string DefaultTimestamp = "2026-08-01T00:00:00Z";
+    private readonly ConcurrentDictionary<string, (string EventSuffix, string? Timestamp)> _presentAggregates = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<(string TenantRef, string AggregateRef)> _requests = new();
 
     /// <summary>Gets every aggregate request in observation order, including repeated polling reads.</summary>
@@ -20,14 +22,16 @@ internal sealed class RecoveryDurableStateMessageHandler : HttpMessageHandler
     /// <summary>Marks a mailbox-intake aggregate present.</summary>
     /// <param name="tenantRef">The aggregate tenant.</param>
     /// <param name="aggregateRef">The aggregate identity.</param>
-    internal void AddMailboxIntake(string tenantRef, string aggregateRef)
-        => Add(tenantRef, aggregateRef, ".MailboxMessageIntakeCaptured");
+    /// <param name="timestamp">The persisted timestamp, or null to omit it.</param>
+    internal void AddMailboxIntake(string tenantRef, string aggregateRef, string? timestamp = DefaultTimestamp)
+        => Add(tenantRef, aggregateRef, ".MailboxMessageIntakeCaptured", timestamp);
 
     /// <summary>Marks a governed-note aggregate present.</summary>
     /// <param name="tenantRef">The aggregate tenant.</param>
     /// <param name="aggregateRef">The aggregate identity.</param>
-    internal void AddGovernedNote(string tenantRef, string aggregateRef)
-        => Add(tenantRef, aggregateRef, ".GovernedNoteRecorded");
+    /// <param name="timestamp">The persisted timestamp, or null to omit it.</param>
+    internal void AddGovernedNote(string tenantRef, string aggregateRef, string? timestamp = DefaultTimestamp)
+        => Add(tenantRef, aggregateRef, ".GovernedNoteRecorded", timestamp);
 
     /// <summary>Marks an aggregate absent.</summary>
     /// <param name="tenantRef">The aggregate tenant.</param>
@@ -44,15 +48,18 @@ internal sealed class RecoveryDurableStateMessageHandler : HttpMessageHandler
         (string tenantRef, string aggregateRef, bool metadata) = Parse(request.RequestUri);
         _requests.Enqueue((tenantRef, aggregateRef));
         OnAggregateRead?.Invoke(tenantRef, aggregateRef);
-        if (!_presentAggregates.TryGetValue(Key(tenantRef, aggregateRef), out string? eventSuffix))
+        if (!_presentAggregates.TryGetValue(Key(tenantRef, aggregateRef), out var aggregate))
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         }
 
+        string timestampProperty = aggregate.Timestamp is null
+            ? string.Empty
+            : $",\"timestamp\":{JsonSerializer.Serialize(aggregate.Timestamp)}";
         string json = metadata
             ? "{\"currentSequence\":1}"
             : $$"""
-                {"tenantId":"{{tenantRef}}","domain":"chatbot","aggregateId":"{{aggregateRef}}","sequenceNumber":1,"messageId":"{{EventMessageId}}","timestamp":"2026-08-01T00:00:00Z","eventTypeName":"Hexalith.ChatBot.Contracts.Events{{eventSuffix}}"}
+                {"tenantId":"{{tenantRef}}","domain":"chatbot","aggregateId":"{{aggregateRef}}","sequenceNumber":1,"messageId":"{{EventMessageId}}","eventTypeName":"Hexalith.ChatBot.Contracts.Events{{aggregate.EventSuffix}}"{{timestampProperty}}}
                 """;
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -60,11 +67,11 @@ internal sealed class RecoveryDurableStateMessageHandler : HttpMessageHandler
         });
     }
 
-    private void Add(string tenantRef, string aggregateRef, string eventSuffix)
+    private void Add(string tenantRef, string aggregateRef, string eventSuffix, string? timestamp)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
         ArgumentException.ThrowIfNullOrWhiteSpace(aggregateRef);
-        _presentAggregates[Key(tenantRef, aggregateRef)] = eventSuffix;
+        _presentAggregates[Key(tenantRef, aggregateRef)] = (eventSuffix, timestamp);
     }
 
     private static string Key(string tenantRef, string aggregateRef) => $"{tenantRef}\u001f{aggregateRef}";

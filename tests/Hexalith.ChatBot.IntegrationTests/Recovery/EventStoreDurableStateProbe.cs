@@ -75,38 +75,41 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         _pollInterval = pollInterval;
     }
 
-    public async Task WaitForMailboxIntakeAsync(
+    public Task WaitForMailboxIntakeAsync(
         string tenantRef,
         string intakeRef,
         CancellationToken cancellationToken)
-        => await WaitForAggregateAsync(
+        => WaitForMailboxIntakeCommitAsync(tenantRef, intakeRef, cancellationToken);
+
+    /// <summary>Waits for and returns the authoritative persisted envelope for a mailbox-intake aggregate.</summary>
+    public Task<DurableCommitObservation> WaitForMailboxIntakeCommitAsync(
+        string tenantRef,
+        string intakeRef,
+        CancellationToken cancellationToken)
+        => WaitForAggregateCommitAsync(
             tenantRef,
             intakeRef,
             ".MailboxMessageIntakeCaptured",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
 
-    /// <summary>Waits for and returns the authoritative persisted envelope for a mailbox-intake aggregate.</summary>
-    public async Task<DurableCommitObservation> WaitForMailboxIntakeCommitAsync(
-        string tenantRef,
-        string intakeRef,
-        CancellationToken cancellationToken)
-    {
-        await WaitForMailboxIntakeAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false);
-        return await ReadMailboxIntakeCommitAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The witnessed mailbox-intake commit disappeared from EventStore actor state.");
-    }
-
-    public async Task WaitForGovernedNoteAsync(
+    public Task WaitForGovernedNoteAsync(
         string tenantRef,
         string noteRef,
         CancellationToken cancellationToken)
-        => await WaitForAggregateAsync(
+        => WaitForGovernedNoteCommitAsync(tenantRef, noteRef, cancellationToken);
+
+    /// <summary>Waits for and returns the authoritative persisted envelope for a governed-note aggregate.</summary>
+    public Task<DurableCommitObservation> WaitForGovernedNoteCommitAsync(
+        string tenantRef,
+        string noteRef,
+        CancellationToken cancellationToken)
+        => WaitForAggregateCommitAsync(
             tenantRef,
             noteRef,
             ".GovernedNoteRecorded",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
 
-    private async Task WaitForAggregateAsync(
+    private async Task<DurableCommitObservation> WaitForAggregateCommitAsync(
         string tenantRef,
         string aggregateRef,
         string expectedEventTypeSuffix,
@@ -115,13 +118,14 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         Stopwatch timer = Stopwatch.StartNew();
         while (timer.Elapsed < _presenceWindow)
         {
-            if (await TryIsAggregateCommittedTolerantlyAsync(
+            DurableCommitObservation? observation = await TryReadAggregateCommitTolerantlyAsync(
                 tenantRef,
                 aggregateRef,
                 expectedEventTypeSuffix,
-                cancellationToken).ConfigureAwait(false))
+                cancellationToken).ConfigureAwait(false);
+            if (observation is not null)
             {
-                return;
+                return observation;
             }
 
             TimeSpan remaining = _presenceWindow - timer.Elapsed;
@@ -137,28 +141,24 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         // polls above — do NOT swallow a persistent inconsistency here. A commit that lands during the last delay
         // must still be observed as present, and a still-inconsistent read at the very end of the window is
         // anomalous rather than merely slow: it must fail closed with its real diagnostic, not a generic timeout.
-        if (await IsAggregateCommittedAsync(
+        return await ReadAggregateCommitAsync(
             tenantRef,
             aggregateRef,
             expectedEventTypeSuffix,
-            cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
-
-        throw new TimeoutException(
-            $"Aggregate '{tenantRef}:chatbot:{aggregateRef}' did not materialize in EventStore actor state.");
+            cancellationToken).ConfigureAwait(false)
+            ?? throw new TimeoutException(
+                $"Aggregate '{tenantRef}:chatbot:{aggregateRef}' did not materialize in EventStore actor state.");
     }
 
     /// <summary>
-    /// Polls <see cref="IsAggregateCommittedAsync"/> while a genuinely transient metadata/event-content mismatch —
+    /// Polls <see cref="ReadAggregateCommitAsync"/> while a genuinely transient metadata/event-content mismatch —
     /// the two actor-state keys committing via separate writes on an eventually-consistent read path — is tolerated
     /// as "not yet observed" rather than failing the whole wait closed on its first inconsistent read. One-shot
     /// callers (<see cref="IsMailboxIntakeCommittedAsync"/>, <see cref="IsGovernedNoteCommittedAsync"/>) deliberately
     /// do not get this tolerance: outside a sustained poll, an inconsistent read must fail closed rather than be
     /// silently reinterpreted as absence.
     /// </summary>
-    private async Task<bool> TryIsAggregateCommittedTolerantlyAsync(
+    private async Task<DurableCommitObservation?> TryReadAggregateCommitTolerantlyAsync(
         string tenantRef,
         string aggregateRef,
         string expectedEventTypeSuffix,
@@ -166,7 +166,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
     {
         try
         {
-            return await IsAggregateCommittedAsync(
+            return await ReadAggregateCommitAsync(
                 tenantRef,
                 aggregateRef,
                 expectedEventTypeSuffix,
@@ -174,7 +174,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         }
         catch (InvalidOperationException)
         {
-            return false;
+            return null;
         }
     }
 
@@ -227,11 +227,11 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             // across the two separately-written actor-state keys, which the next iteration (or the final closing
             // read below) will observe once consistent, rather than a reason to abort the whole sustained-absence
             // assertion.
-            if (await TryIsAggregateCommittedTolerantlyAsync(
+            if (await TryReadAggregateCommitTolerantlyAsync(
                 tenantRef,
                 aggregateRef,
                 expectedEventTypeSuffix,
-                cancellationToken).ConfigureAwait(false))
+                cancellationToken).ConfigureAwait(false) is not null)
             {
                 return false;
             }
@@ -332,6 +332,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             !RecoveryValidationEvidenceManifest.IsCanonicalUlid(eventRef) ||
             !TryGetDateTimeOffset(persistedEvent.Value, "Timestamp", out DateTimeOffset committedAtUtc) ||
             committedAtUtc.Offset != TimeSpan.Zero ||
+            committedAtUtc == default || committedAtUtc > DateTimeOffset.UtcNow ||
             GetString(persistedEvent.Value, "EventTypeName")?.EndsWith(
                 expectedEventTypeSuffix,
                 StringComparison.Ordinal) != true)
