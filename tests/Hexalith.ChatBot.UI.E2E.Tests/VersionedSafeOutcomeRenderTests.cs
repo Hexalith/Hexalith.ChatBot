@@ -438,11 +438,12 @@ public sealed class VersionedSafeOutcomeRenderTests
     }
 
     [Theory]
-    [InlineData(false, "retry-later", "retry-later", false)]
-    [InlineData(true, "none", "none", false)]
-    [InlineData(true, "retry-later", "retry-later", true)]
-    public async Task FailureItemShouldRespectRetryPermissionWithCallback(
-        bool retryable, string safeAction, string clientAction, bool enabled)
+    [InlineData(false, "retry-later", "retry-later", true, false)]
+    [InlineData(true, "none", "none", true, false)]
+    [InlineData(true, "retry-later", "retry-later", true, true)]
+    [InlineData(true, "retry-later", "retry-later", false, false)]
+    public async Task FailureItemShouldDescribeOnlyAvailableRetryActions(
+        bool retryable, string safeAction, string clientAction, bool hasCallback, bool enabled)
     {
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
         CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
@@ -464,7 +465,7 @@ public sealed class VersionedSafeOutcomeRenderTests
                 """{"itemId":"failure-retry","kind":"FailureState","actorKind":"System","actorLabel":"Worker","occurredAt":"2026-01-01T00:00:00Z","failureStatus":"failed","messageCatalogCode":"failed_attachment","messageDetailVisibility":"metadata_only"}""",
                 new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             item = item with { Retryable = retryable, SafeNextAction = safeAction, ClientAction = clientAction };
-            EventCallback callback = EventCallback.Factory.Create(this, () => { });
+            EventCallback callback = hasCallback ? EventCallback.Factory.Create(this, () => { }) : default;
 
             string html = await renderer.Dispatcher.InvokeAsync(async () =>
                 (await renderer.RenderComponentAsync<ChatBotFailureStateConversationItem>(ParameterView.FromDictionary(new Dictionary<string, object?>
@@ -474,11 +475,16 @@ public sealed class VersionedSafeOutcomeRenderTests
                 })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
 
             html.ShouldContain($"aria-disabled=\"{(!enabled).ToString().ToLowerInvariant()}\"");
+            string retryMetadata = Regex.Match(WebUtility.HtmlDecode(html), @"Retryable\s*</[^>]+>\s*<[^>]+>\s*(Yes|No)").Groups[1].Value;
+            retryMetadata.ShouldBe(enabled ? "Yes" : "No");
             if (!enabled)
             {
                 html.ShouldContain("aria-describedby=\"failure-retry-safe-action-disabled-reason\"");
-                html.ShouldContain("<code class=\"chatbot-code\">none</code>");
-                WebUtility.HtmlDecode(html).ShouldContain("State not permitted");
+                if (hasCallback)
+                {
+                    html.ShouldContain("<code class=\"chatbot-code\">none</code>");
+                    WebUtility.HtmlDecode(html).ShouldContain("State not permitted");
+                }
                 WebUtility.HtmlDecode(html).ShouldNotContain("No user action is required.");
             }
         }

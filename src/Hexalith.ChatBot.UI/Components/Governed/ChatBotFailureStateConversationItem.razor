@@ -172,7 +172,9 @@
 
     private string? RetryableText
         => IsGenericDenial ? UiText[ChatBotUiTextKey.NoLabel]
-            : Item.Retryable is null ? null : (Item.Retryable.Value && !IsTerminal ? UiText[ChatBotUiTextKey.YesLabel] : UiText[ChatBotUiTextKey.NoLabel]);
+            : Item.Retryable is null ? null
+                : OnNextAction.HasDelegate && ResolvedSafeNextAction == ChatBotMessageNextActions.RetryLater
+                    ? UiText[ChatBotUiTextKey.YesLabel] : UiText[ChatBotUiTextKey.NoLabel];
 
     private string? RetryCountText
         => IsGenericDenial || (Item.RetryCount is null && Item.MaxRetryCount is null)

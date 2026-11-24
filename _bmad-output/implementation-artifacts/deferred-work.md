@@ -1533,7 +1533,15 @@ resolution: Unknown persisted completion or audit values produce a generic, non-
 
 ## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-13)
 
-- Failure card can say retry is allowed when the action was withheld (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148`). Outside the contracts and server slice. `RetryableText` shows Yes when the stored retry flag is true and the catalog entry is not terminal, even if `SafeNextAction` does not match the catalog action. Re-check in the UI review group.
+### DW-145: Failure card can say retry is allowed when the action was withheld.
+
+origin: legacy ledger entry from Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-13)
+severity: medium
+reason: Failure card can say retry is allowed when the action was withheld (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148`). Outside the contracts and server slice. `RetryableText` shows Yes when the stored retry flag is true and the catalog entry is not terminal, even if `SafeNextAction` does not match the catalog action. Re-check in the UI review group.
+status: done 2026-11-24
+resolution: Failure cards show positive retry copy only when the catalogue, retained action, and callback allow retry. Render tests verify the metadata and action together.
+
+
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Reconcile known terminal failure codes with independently stored resolved statuses in failure conversation items.
