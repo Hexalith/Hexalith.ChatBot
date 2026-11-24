@@ -2223,6 +2223,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Nightly recovery/release hooks no longer fail closed when they discover zero tests.
   evidence: `live-recovery.runsettings` (`TreatNoTestsAsError`) was deleted; `.github/actions/nightly/run-recovery.sh` and `run-release.sh` call `dotnet test` without that switch. Nightly CiCd safety net, not this story.
+  resolution: Resolved 2026-11-24. The nightly release hook requires at least one test through Microsoft.Testing.Platform. A controlled run made the application succeed with zero tests and confirmed that the hook exited 9. The existing CTRF recovery guard independently rejected a zero-test run.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: empty SDK terminal-refusal ids may throw from `CommandEnvelope` instead of a typed refusal.

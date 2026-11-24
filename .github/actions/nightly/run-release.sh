@@ -5,4 +5,4 @@ set -euo pipefail
 # SIGINT gives the topology one minute to restore/close before the hard bound.
 timeout --signal=INT --kill-after=1m 29m \
     dotnet test --project tests/Hexalith.ChatBot.Release.Tests/Hexalith.ChatBot.Release.Tests.csproj \
-    --configuration Release --no-build --no-restore
+    --configuration Release --no-build --no-restore --minimum-expected-tests 1
