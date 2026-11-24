@@ -113,6 +113,39 @@ internal static class PackageCatalogTestHelper
     /// <summary>Evaluates an actual package wrapper with a bounded MSBuild subprocess and optional global resolver properties.</summary>
     public static JsonDocument EvaluateWrapper(string wrapperPath, IReadOnlyDictionary<string, string>? globalProperties = null)
     {
+        List<string> arguments =
+        [
+            "-property:Configuration=Release",
+            "-getProperty:ManagePackageVersionsCentrally",
+            "-getProperty:CentralPackageVersionOverrideEnabled",
+            "-getProperty:HexalithBuildsRoot",
+            "-getItem:PackageVersion",
+        ];
+        if (globalProperties is not null)
+        {
+            foreach ((string name, string value) in globalProperties)
+            {
+                arguments.Add($"-property:{name}={value}");
+            }
+        }
+
+        return EvaluateWithMsBuild(wrapperPath, arguments);
+    }
+
+    /// <summary>Evaluates a project without inheriting the invoking test lane's dependency-mode inputs.</summary>
+    public static JsonDocument EvaluateProjectReferences(string projectPath, params string[] configurationArguments)
+        => EvaluateWithMsBuild(
+            projectPath,
+            [
+                "-getProperty:UseHexalithProjectReferences,HexalithEventStoreRoot",
+                "-getItem:ProjectReference,PackageReference,PackageVersion",
+                .. configurationArguments,
+            ],
+            clearModeEnvironment: true);
+
+    private static JsonDocument EvaluateWithMsBuild(
+        string projectPath, IReadOnlyList<string> arguments, bool clearModeEnvironment = false)
+    {
         ProcessStartInfo startInfo = new("dotnet")
         {
             RedirectStandardError = true,
@@ -121,28 +154,39 @@ internal static class PackageCatalogTestHelper
             WorkingDirectory = RepositoryRoot(),
         };
         startInfo.ArgumentList.Add("msbuild");
-        startInfo.ArgumentList.Add(wrapperPath);
-        startInfo.ArgumentList.Add("-property:Configuration=Release");
-        startInfo.ArgumentList.Add("-getProperty:ManagePackageVersionsCentrally");
-        startInfo.ArgumentList.Add("-getProperty:CentralPackageVersionOverrideEnabled");
-        startInfo.ArgumentList.Add("-getProperty:HexalithBuildsRoot");
-        startInfo.ArgumentList.Add("-getItem:PackageVersion");
-        if (globalProperties is not null)
+        startInfo.ArgumentList.Add(projectPath);
+        foreach (string argument in arguments)
         {
-            foreach ((string name, string value) in globalProperties)
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        if (clearModeEnvironment)
+        {
+            foreach (string name in new[]
             {
-                startInfo.ArgumentList.Add($"-property:{name}={value}");
+                "CI",
+                "Configuration",
+                "UseHexalithProjectReferences",
+                "CustomBeforeDirectoryBuildProps",
+                "CustomAfterMicrosoftCommonProps",
+                "CustomBeforeDirectoryBuildTargets",
+                "CustomAfterDirectoryBuildTargets",
+                "AfterMicrosoftNETSdkTargets",
+                "HEXALITH_SOURCE_MAPPING_HASH",
+            })
+            {
+                startInfo.Environment.Remove(name);
             }
         }
 
         using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start dotnet msbuild to evaluate the package catalog.");
+            ?? throw new InvalidOperationException("Could not start dotnet msbuild to evaluate the project.");
         Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
         Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(120_000))
         {
             process.Kill(entireProcessTree: true);
-            throw new InvalidOperationException("Package catalog evaluation timed out after 120 seconds.");
+            throw new InvalidOperationException("MSBuild evaluation timed out after 120 seconds.");
         }
 
         string standardOutput = standardOutputTask.GetAwaiter().GetResult();
@@ -150,7 +194,7 @@ internal static class PackageCatalogTestHelper
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"Package wrapper '{wrapperPath}' evaluation failed with exit code {process.ExitCode}:{Environment.NewLine}{standardError}{standardOutput}");
+                $"MSBuild evaluation of '{projectPath}' failed with exit code {process.ExitCode}:{Environment.NewLine}{standardError}{standardOutput}");
         }
 
         return JsonDocument.Parse(standardOutput);

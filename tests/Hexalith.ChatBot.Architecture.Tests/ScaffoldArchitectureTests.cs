@@ -1083,6 +1083,78 @@ public static class ScaffoldArchitectureTests
         PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
 
+    /// <summary>The evaluated server chooses one EventStore reference family for the effective dependency mode.</summary>
+    /// <param name="configuration">The explicit configuration, if supplied.</param>
+    /// <param name="ci">Whether to set the CI property.</param>
+    /// <param name="explicitMode">The explicit dependency-mode override, if supplied.</param>
+    /// <param name="usesSource">Whether the server should reference EventStore projects.</param>
+    [Theory]
+    [InlineData(null, false, null, true)]
+    [InlineData("Debug", false, null, true)]
+    [InlineData("Release", false, null, false)]
+    [InlineData(null, true, null, false)]
+    [InlineData("Debug", true, null, false)]
+    [InlineData("Debug", false, "false", false)]
+    [InlineData("Release", false, "true", true)]
+    public static void EvaluatedServerShouldSelectMatchingEventStoreReferenceFamily(
+        string? configuration, bool ci, string? explicitMode, bool usesSource)
+    {
+        List<string> arguments = [];
+        if (configuration is not null)
+        {
+            arguments.Add($"-property:Configuration={configuration}");
+        }
+
+        if (ci)
+        {
+            arguments.Add("-property:CI=true");
+        }
+
+        if (explicitMode is not null)
+        {
+            arguments.Add($"-property:UseHexalithProjectReferences={explicitMode}");
+        }
+
+        string project = Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Hexalith.ChatBot.Server.csproj");
+        using JsonDocument evaluation = PackageCatalogTestHelper.EvaluateProjectReferences(project, [.. arguments]);
+        JsonElement properties = evaluation.RootElement.GetProperty("Properties");
+        properties.GetProperty("UseHexalithProjectReferences").GetString().ShouldBe(usesSource ? "true" : "false");
+
+        JsonElement items = evaluation.RootElement.GetProperty("Items");
+        string[] expectedEventStore = ["Hexalith.EventStore.Client", "Hexalith.EventStore.Contracts", "Hexalith.EventStore.DomainService"];
+        JsonElement[] eventStoreProjects = items.GetProperty("ProjectReference").EnumerateArray()
+            .Where(static item => item.GetProperty("Filename").GetString()!.StartsWith("Hexalith.EventStore.", StringComparison.Ordinal))
+            .OrderBy(static item => item.GetProperty("Filename").GetString(), StringComparer.Ordinal)
+            .ToArray();
+        eventStoreProjects.Select(static item => item.GetProperty("Filename").GetString()!)
+            .ShouldBe(usesSource ? expectedEventStore : []);
+        EventStoreItems(items, "PackageReference", "Identity").ShouldBe(usesSource ? [] : expectedEventStore);
+        if (usesSource)
+        {
+            string expectedRoot = Path.Combine(RepositoryRoot(), "references", "Hexalith.EventStore");
+            string? actualRoot = properties.GetProperty("HexalithEventStoreRoot").GetString();
+            actualRoot.ShouldNotBeNullOrWhiteSpace();
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(actualRoot!)).ShouldBe(expectedRoot);
+            string[] expectedProjects = expectedEventStore.Select(name => Path.Combine(expectedRoot, "src", name, name + ".csproj")).ToArray();
+            string[] actualProjects = eventStoreProjects.Select(static item => item.GetProperty("FullPath").GetString()!).ToArray();
+            actualProjects.ShouldBe(expectedProjects);
+            actualProjects.ShouldAllBe(static path => File.Exists(path));
+        }
+        foreach (string name in expectedEventStore)
+        {
+            JsonElement version = items.GetProperty("PackageVersion").EnumerateArray()
+                .Single(item => item.GetProperty("Identity").GetString() == name);
+            version.GetProperty("Version").GetString().ShouldBe(PackageCatalogTestHelper.Version(name));
+        }
+
+        static string[] EventStoreItems(JsonElement items, string itemType, string metadata)
+            => items.GetProperty(itemType).EnumerateArray()
+                .Select(item => item.GetProperty(metadata).GetString()!)
+                .Where(name => name.StartsWith("Hexalith.EventStore.", StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+    }
+
     [Fact]
     public static void RootConfigurationShouldPinSdkTargetFrameworkAndCentralPackages()
     {

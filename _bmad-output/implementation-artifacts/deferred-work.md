@@ -1482,6 +1482,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Add evaluated MSBuild regression coverage for dependency-mode defaults in independent build maintenance (pre-existing, medium).
   evidence: Round19Build-VG-2 pre-verifies that removing the empty-Configuration arm in Directory.Build.props restores ordinary local package selection while architecture XML checks and explicitly overridden CI builds still pass. The default-source fix was independently committed as 69eec6b779500eaf22f8720f67170c921c57e1ae and is untouched by this policy-snapshot run. Evaluate a consuming project's selected property and project/package reference items with overrides absent, explicit Debug, Release and CI to pin the intended selection behavior.
+  resolution: Resolved 2026-11-24. Seven real Server project evaluations passed. The tests cover default, Debug, Release, CI and explicit mode overrides, and verify the resulting EventStore reference family against the shared package catalog.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 20)
 
