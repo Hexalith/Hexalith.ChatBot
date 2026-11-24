@@ -165,13 +165,14 @@ public sealed class RealRenderApprovalE2ETests
         await Assertions.Expect(approveGroup).ToHaveAttributeAsync("aria-disabled", "true");
         string? reasonId = await approveGroup.GetAttributeAsync("aria-describedby");
         reasonId.ShouldNotBeNullOrWhiteSpace();
-        await Assertions.Expect(rows.First.Locator($"[id='{reasonId}']"))
-            .ToContainTextAsync("Batch approval is unavailable");
+        ILocator reason = rows.First.Locator($"[id='{reasonId}']");
+        await Assertions.Expect(reason).ToContainTextAsync("Batch approval is unavailable");
+        await Assertions.Expect(reason).ToHaveAttributeAsync("tabindex", "0");
         await Assertions.Expect(priority.Locator("[data-approval-partial-authority-reason]"))
             .ToContainTextAsync("Batch approval is unavailable");
-        await approveGroup.FocusAsync();
-        await Assertions.Expect(approveGroup).ToBeFocusedAsync();
-        await page.Keyboard.PressAsync("Enter");
+        await approveGroup.PressAsync("Enter");
+        await reason.FocusAsync();
+        await Assertions.Expect(reason).ToBeFocusedAsync();
 
         await page.SetViewportSizeAsync(390, 844);
         await Assertions.Expect(priority.Locator("[data-approval-priority-table]")).ToBeHiddenAsync();
