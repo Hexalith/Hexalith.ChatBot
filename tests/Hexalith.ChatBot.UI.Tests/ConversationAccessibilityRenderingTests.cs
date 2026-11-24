@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Net;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
+using Hexalith.ChatBot.Client;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.UI.Components.Governed;
 using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.Localization;
@@ -126,6 +129,55 @@ public sealed class ConversationAccessibilityRenderingTests
         Ids(renders[1]).ShouldBe(Ids(renders[0]));
     }
 
+    /// <summary>Two populated streams with identical items keep every item-derived ID and reference local.</summary>
+    /// <param name="explicitScope">Whether the caller supplies the ID scope instead of the stream instance default.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RepeatedPopulatedStreamsShouldScopeItemIdsAndResolveReferencesPerStream(bool explicitScope)
+    {
+        ProjectConversationItemModel[] items = PopulatedStreamItems();
+        List<string> renders = await RenderPairAsync<ChatBotConversationStream>(index => explicitScope
+            ? new()
+            {
+                [nameof(ChatBotConversationStream.Items)] = items,
+                [nameof(ChatBotConversationStream.IdScope)] = $"feed-{index}",
+            }
+            : new() { [nameof(ChatBotConversationStream.Items)] = items },
+            [new() { [nameof(ChatBotConversationStream.Title)] = "Updated conversation" }]);
+        foreach (string html in renders)
+        {
+            AssertUniqueIds(html);
+            string[] streams = StreamSections(html);
+            streams.Length.ShouldBe(2);
+            for (int index = 0; index < streams.Length; index++)
+            {
+                string stream = streams[index];
+                AssertReferencesResolve(stream);
+                string titleId = Regex.Match(stream, "aria-labelledby=\"([^\"]+)\"").Groups[1].Value;
+                string scope = explicitScope ? $"feed-{index}" : titleId[..^"-title".Length];
+                Ids(stream).Where(id => id != titleId).ShouldBe(
+                [
+                    $"chatbot-evidence-item:participant-{scope}-participant-evidence-reason",
+                    $"participant-item:participant-{scope}-unavailable-reason",
+                    $"chatbot-evidence-item:participant-{scope}-participant-evidence-chip-reason",
+                    $"chatbot-evidence-item:attachment-{scope}-attachment-evidence-reason",
+                    $"attachment-item:attachment-{scope}-unavailable-reason",
+                    $"chatbot-evidence-item:attachment-{scope}-attachment-evidence-chip-reason",
+                    $"chatbot-evidence-item:approval-{scope}-reason",
+                    $"chatbot-approval-item:approval-{scope}-approve-reason",
+                    $"item:failure-{scope}-failure-announcement",
+                    $"item:failure-{scope}-safe-action-disabled-reason",
+                ]);
+            }
+
+            // The failure announcement data attribute stays unscoped, like its deduplication key.
+            Regex.Matches(html, "data-chatbot-failure-announcement=\"item:failure\"").Count.ShouldBe(2);
+        }
+
+        Ids(renders[1]).ShouldBe(Ids(renders[0]));
+    }
+
     /// <summary>Route-level blocked-state headings retain their default level two.</summary>
     [Fact]
     public async Task StandaloneBlockedStateShouldKeepHeadingAtLevelTwo()
@@ -207,6 +259,7 @@ public sealed class ConversationAccessibilityRenderingTests
         services.AddSingleton<ChatBotUiTextLocalizer>();
         services.AddSingleton<ChatBotCultureFormatter>();
         services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+        services.AddSingleton(new ProjectConversationService(DispatchProxy.Create<IChatBotClient, RenderOnlyChatBotClient>()));
         return services.BuildServiceProvider();
     }
 
@@ -261,6 +314,41 @@ public sealed class ConversationAccessibilityRenderingTests
     private static string[] ComposerSections(string html)
         => Regex.Split(html, "(?=<section class=\"chatbot-governed-composer)")
             .Where(part => part.StartsWith("<section", StringComparison.Ordinal)).ToArray();
+
+    private static string[] StreamSections(string html)
+        => Regex.Split(html, "(?=<section class=\"chatbot-conversation-stream\")")
+            .Where(part => part.StartsWith("<section", StringComparison.Ordinal)).ToArray();
+
+    private static ProjectConversationItemModel[] PopulatedStreamItems()
+    {
+        ProjectConversationItemModel item = System.Text.Json.JsonSerializer.Deserialize<ProjectConversationItemModel>(
+            """
+            {
+              "itemId": "item:email", "kind": "EmailDerived", "actorKind": "Mailbox", "actorLabel": "Mailbox intake",
+              "occurredAt": "2026-01-01T00:00:00Z", "lifecycleState": "Associated", "thresholdBand": "high",
+              "confidenceScore": 0.9, "associationId": "association-shared", "sourceMailboxId": "mailbox-shared",
+              "sourceConversationId": "conversation-shared", "sourceProvenance": "Mailbox intake",
+              "redactionState": "metadata_only", "retentionClass": "standard", "schemaVersion": "v1",
+              "sourceVersion": 1, "correlationId": "correlation-shared",
+              "participantAllowedReviewActions": [], "attachmentAllowedActions": [], "evidenceReferenceSummary": [],
+              "requiredStoreKeys": [], "completedStoreKeys": [], "failedStoreKeys": [],
+              "approvalRiskActionClasses": [], "approvalAiRiskActionClasses": [], "approvalEvidenceReferences": [],
+              "approvalEvidenceFreshnessStates": [], "approvalAffectedResourceReferences": [], "approvalRecipientReferences": []
+            }
+            """,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The populated conversation item fixture could not be created.");
+        return
+        [
+            item with { ItemId = "item:participant", Kind = "Participant", ParticipantDisplayKind = "UnresolvedParticipant", ParticipantStatus = "Unresolved" },
+            item with { ItemId = "item:attachment", Kind = "Attachment", AttachmentScanStatus = "Unavailable", AttachmentRedactionState = "metadata_only" },
+            item with { ItemId = "item:decision", Kind = "SystemDecision", DecisionKind = "Associate" },
+            item with { ItemId = "item:approval", Kind = "ApprovalEvent", ApprovalStatus = "pending", ApprovalDisabledReason = "policy-blocked", ApprovalEvidenceReferences = ["evidence:expired"], ApprovalEvidenceFreshnessStates = ["expired"] },
+            item with { ItemId = "item:failure", Kind = "FailureState", MessageCatalogCode = ChatBotMessageCodes.FailedCommand, FailureStatus = "failed", MessageDetailVisibility = "metadata_only" },
+            item with { ItemId = "item:ai-outcome", Kind = "AiOutcome", AiOutcomeStatus = "Succeeded", AiAuthorizedContextReferences = ["evidence:file:requirements"] },
+            item,
+        ];
+    }
 
     private static string[] InputIds(string html)
         => Regex.Matches(html, "<fluent-textarea[^>]*id=\"([^\"]+)\"")

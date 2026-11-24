@@ -14,7 +14,7 @@
                          Class="chatbot-ai-outcome-conversation-item__header">
                 <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                                      Text="@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]"
-                                     StableId="@Item.ItemId" />
+                                     StableId="@($"{Item.ItemId}{ScopeSuffix}")" />
                 <ChatBotRiskChip RiskClass="@RiskActionClass"
                                  PolicyReason="@RiskSummary" />
                 <FluentText As="TextTag.Span" Class="chatbot-ai-outcome-conversation-item__status">@UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus)</FluentText>
@@ -82,7 +82,7 @@
                 {
                     <li><ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                                              Text="@reference"
-                                             StableId="@($"{Item.ItemId}-evidence-{reference}")" /></li>
+                                             StableId="@($"{Item.ItemId}{ScopeSuffix}-evidence-{reference}")" /></li>
                 }
             </ul>
         }
@@ -122,6 +122,15 @@
 @code {
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
+
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. Repeated conversation streams render the same
+    /// items, so ids built from the item or association identity would otherwise repeat and cross-wire aria references.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
 
     private string ActorLabel
         => string.IsNullOrWhiteSpace(Item.ActorLabel)

@@ -5,7 +5,7 @@
 
 <FluentText As="TextTag.Span"
             Class="chatbot-visually-hidden"
-            id="@($"{Item.ItemId}-failure-announcement")"
+            id="@($"{Item.ItemId}{ScopeSuffix}-failure-announcement")"
             data-chatbot-failure-announcement="@Item.ItemId"
             role="@AriaRole"
             aria-live="@AriaLive"
@@ -24,7 +24,7 @@
                          Class="chatbot-failure-conversation-item__header">
                 <ChatBotEvidenceChip State="@EvidenceState"
                                      Text="@UiText.FailureCatalogHeadline(CatalogEntry.Code)"
-                                     StableId="@Item.ItemId" />
+                                     StableId="@($"{Item.ItemId}{ScopeSuffix}")" />
                 <ChatBotRiskChip RiskClass="ChatBotRiskActionClass.ProjectMutating"
                                  PolicyReason="@UiText.FailureBlockedReasonLabel(Item.BlockedReason)" />
                 <FluentText As="TextTag.Span" Class="chatbot-failure-conversation-item__status">@UiText.FailureStatusLabel(ResolvedFailureStatus)</FluentText>
@@ -84,7 +84,7 @@
     @if (CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
     {
         <ChatBotGovernedAction Label="@UiText.FailureNextActionLabel(CatalogEntry.NextAction)"
-                                 StableId="@($"{Item.ItemId}-safe-action")"
+                                 StableId="@($"{Item.ItemId}{ScopeSuffix}-safe-action")"
                                  CriticalAction="false"
                                  State="@(OnNextAction.HasDelegate && ActionPermitted ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
                                  DisabledReason="@UiText.FailureBlockedReasonLabel(ActionPermitted ? CatalogEntry.DisabledActionReason : ChatBotDisabledActionReasons.StateNotPermitted)"
@@ -120,6 +120,16 @@
 
     [Parameter]
     public bool Announce { get; set; }
+
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. Repeated conversation streams render the same
+    /// items, so ids built from the item identity would otherwise repeat and cross-wire aria references. The
+    /// announcement deduplication key and the failure-announcement data attribute stay unscoped.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
 
     private ChatBotMessageCatalogEntry CatalogEntry
         => UiText.FailureCatalogEntryForFailure(Item.MessageCatalogCode);

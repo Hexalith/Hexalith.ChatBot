@@ -16,7 +16,7 @@
                          Class="chatbot-approval-conversation-item__header">
                 <ChatBotEvidenceChip State="@EvidenceState"
                                      Text="@EvidenceSummary"
-                                     StableId="@Item.ItemId"
+                                     StableId="@($"{Item.ItemId}{ScopeSuffix}")"
                                      CanOpenEvidence="@CanOpenEvidence"
                                      UnavailableReason="@EvidenceUnavailableReason"
                                      OnActivate="@OpenWhyThisProjectAsync" />
@@ -192,6 +192,15 @@
     [Parameter]
     public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
 
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. Repeated conversation streams render the same
+    /// items, so ids built from the item or association identity would otherwise repeat and cross-wire aria references.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
+
     private ElementReference _decisionStatusElement;
 
     private bool _decisionInFlight;
@@ -222,7 +231,7 @@
 
     private string ApproveAriaDisabled => CanApprove ? "false" : "true";
 
-    private string ApproveReasonId => $"chatbot-approval-{Item.ItemId}-approve-reason";
+    private string ApproveReasonId => $"chatbot-approval-{Item.ItemId}{ScopeSuffix}-approve-reason";
 
     // Mirrors GovernedOperationAggregate.ApprovalDisabledReason: the domain treats a freshness list that does
     // not line up with the evidence list as expired for approval, so the surface must too — otherwise Approve

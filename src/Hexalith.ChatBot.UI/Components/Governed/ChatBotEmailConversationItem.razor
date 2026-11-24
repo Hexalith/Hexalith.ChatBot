@@ -57,7 +57,7 @@
                              Text="@ConfidenceLabel" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                              Text="@UiText[ChatBotUiTextKey.WhyProjectOpenAction]"
-                             StableId="@($"why-{Item.AssociationId}")"
+                             StableId="@($"why-{Item.AssociationId}{ScopeSuffix}")"
                              CanOpenEvidence="true"
                              OnActivate="@OpenWhyThisProjectAsync" />
     </div>
@@ -73,6 +73,15 @@
 
     [Parameter]
     public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
+
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. Repeated conversation streams render the same
+    /// items, so ids built from the item or association identity would otherwise repeat and cross-wire aria references.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
 
     private bool IsSystemDecision => string.Equals(Item.ActorKind, "SystemDecision", StringComparison.Ordinal);
 

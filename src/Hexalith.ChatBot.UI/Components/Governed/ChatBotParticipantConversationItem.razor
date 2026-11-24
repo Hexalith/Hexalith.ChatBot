@@ -16,7 +16,7 @@
                 <ChatBotEvidenceChip State="@EvidenceState"
                                      Text="@EvidenceText"
                                      UnavailableReason="@EvidenceUnavailableReason"
-                                     StableId="@($"{Item.ItemId}-participant-evidence")" />
+                                     StableId="@($"{Item.ItemId}{ScopeSuffix}-participant-evidence")" />
                 <FluentText As="TextTag.Span" Class="chatbot-participant-conversation-item__status">@LocalizedParticipantStatus</FluentText>
                 <ChatBotActorBadge Category="@ActorCategory"
                                    DisplayLabel="@DisplayLabel"
@@ -68,7 +68,7 @@
         <ChatBotEvidenceChip State="@EvidenceState"
                              Text="@EvidenceText"
                              UnavailableReason="@EvidenceUnavailableReason"
-                             StableId="@($"{Item.ItemId}-participant-evidence-chip")" />
+                             StableId="@($"{Item.ItemId}{ScopeSuffix}-participant-evidence-chip")" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Redacted"
                              Text="@(Item.ParticipantRedactionState ?? Item.RedactionState)" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
@@ -83,6 +83,15 @@
 @code {
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
+
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. Repeated conversation streams render the same
+    /// items, so ids built from the item or association identity would otherwise repeat and cross-wire aria references.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
 
     private bool IsRestricted => string.Equals(Item.ParticipantDisplayKind, "RestrictedParticipant", StringComparison.Ordinal);
 
@@ -150,7 +159,7 @@
     private string AccessibleLabel
         => UiText.Get(ChatBotUiTextKey.ProjectConversationParticipantItemAccessible, DisplayKindText, DisplayLabel, Item.LifecycleState);
 
-    private string UnavailableReasonId => $"participant-{Item.ItemId}-unavailable-reason";
+    private string UnavailableReasonId => $"participant-{Item.ItemId}{ScopeSuffix}-unavailable-reason";
 
     private static string FormatUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
