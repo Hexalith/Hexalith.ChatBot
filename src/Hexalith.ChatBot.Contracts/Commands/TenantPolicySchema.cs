@@ -46,7 +46,8 @@ public static class TenantPolicySchema
 
         List<string> errors = [];
         HashSet<string> seen = new(StringComparer.Ordinal);
-        Dictionary<string, TenantPolicyValue> values = new(StringComparer.Ordinal);
+        double? lowThreshold = null;
+        double? highThreshold = null;
         foreach (TenantPolicyValue value in changeSet.Values)
         {
             if (!IsSafePolicyToken(value.KnobId) || !seen.Add(value.KnobId))
@@ -61,8 +62,24 @@ public static class TenantPolicySchema
                 continue;
             }
 
-            values[value.KnobId] = value;
-            errors.AddRange(ValidateValue(definition, value, values));
+            int priorErrorCount = errors.Count;
+            errors.AddRange(ValidateValue(definition, value));
+            if (errors.Count == priorErrorCount)
+            {
+                if (value.KnobId == TenantPolicyKnobIds.AssociationTLow)
+                {
+                    lowThreshold = value.NumberValue;
+                }
+                else if (value.KnobId == TenantPolicyKnobIds.AssociationTHigh)
+                {
+                    highThreshold = value.NumberValue;
+                }
+            }
+        }
+
+        if (lowThreshold >= highThreshold)
+        {
+            errors.Add($"range_invalid:{TenantPolicyKnobIds.AssociationTLow}");
         }
 
         return errors.Count == 0
@@ -109,11 +126,10 @@ public static class TenantPolicySchema
 
     private static IEnumerable<string> ValidateValue(
         TenantPolicyKnobDefinition definition,
-        TenantPolicyValue value,
-        IReadOnlyDictionary<string, TenantPolicyValue> values)
+        TenantPolicyValue value)
         => definition.Type switch
         {
-            TenantPolicyKnobType.Double => ValidateDouble(definition, value, values),
+            TenantPolicyKnobType.Double => ValidateDouble(definition, value),
             TenantPolicyKnobType.Enum => ValidateEnum(definition, value),
             TenantPolicyKnobType.Boolean => ValidateBoolean(value),
             TenantPolicyKnobType.String => ValidateString(value),
@@ -193,8 +209,7 @@ public static class TenantPolicySchema
 
     private static IEnumerable<string> ValidateDouble(
         TenantPolicyKnobDefinition definition,
-        TenantPolicyValue value,
-        IReadOnlyDictionary<string, TenantPolicyValue> values)
+        TenantPolicyValue value)
     {
         if (value.NumberValue is not { } number || double.IsNaN(number) || double.IsInfinity(number) ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
@@ -210,14 +225,6 @@ public static class TenantPolicySchema
             definition.Maximum is { } maximum && number > maximum)
         {
             yield return $"range_invalid:{definition.KnobId}";
-        }
-
-        if (string.Equals(definition.KnobId, TenantPolicyKnobIds.AssociationTLow, StringComparison.Ordinal) &&
-            values.TryGetValue(TenantPolicyKnobIds.AssociationTHigh, out TenantPolicyValue? high) &&
-            high.NumberValue is { } highValue &&
-            number >= highValue)
-        {
-            yield return "range_invalid:association.t-low";
         }
     }
 

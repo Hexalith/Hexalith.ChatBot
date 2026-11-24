@@ -1658,9 +1658,16 @@ resolution: Typed problems with undefined categories and generated-client JSON p
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-17, round 14)
 
-- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
-  summary: `TenantPolicySchema.Validate` rejects `t-low >= t-high` only when `t-high` appears earlier in the change set, so `[t-low=0.95, t-high=0.90]` validates (pre-existing, medium).
-  evidence: `TenantPolicySchema.cs:213-218` compares against values already seen in the loop. `ImmutableTenantPolicySnapshot` sorts knobs to work around it; the live callers (`GovernedOperationAggregate`, `AcceptedCommandDispatcher`, `ParticipantAuthorizationStage`) are currently behind the Story 1.6 policy gate. Move the cross-knob check after the loop before lifting the gate.
+### DW-147: `TenantPolicySchema.Validate` rejects `t-low >= t-high` only when `t-high` appears earlier in the change set, so `[t-low=0.95, t-high=0.90]` validates (pre-existing, medium).
+
+origin: legacy ledger entry from Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-17, round 14)
+source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+severity: medium
+reason: `TenantPolicySchema.cs:213-218` compares against values already seen in the loop. `ImmutableTenantPolicySnapshot` sorts knobs to work around it; the live callers (`GovernedOperationAggregate`, `AcceptedCommandDispatcher`, `ParticipantAuthorizationStage`) are currently behind the Story 1.6 policy gate. Move the cross-knob check after the loop before lifting the gate.
+status: done 2026-11-24
+resolution: The threshold relationship is checked after validating both values. The tests cover increasing, equal and reversed pairs in both orders and preserve one-threshold updates.
+
+
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Association scoring uses the caller-supplied `ThresholdPolicy` or falls back to `AssociationThresholdPolicySnapshot.DefaultM0`, and decisions record `command.ThresholdPolicy.PolicyVersion` without checking it against the tenant's threshold version (pre-existing, medium).
   evidence: `AssociationScoringOrchestrator.cs:44`; `GovernedOperationAggregate.cs:2760/2792/2821`. Conflicts with "no default policy" and exact decision references; owned by Story 2.6 (association rules and confidence thresholds).
