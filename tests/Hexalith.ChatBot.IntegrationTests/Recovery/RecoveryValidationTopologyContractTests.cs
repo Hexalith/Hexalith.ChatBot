@@ -45,6 +45,7 @@ public sealed class RecoveryValidationTopologyContractTests
         $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
         "--ChatBot:Projects:Endpoint=http://localhost:65535",
         $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
+        "--ChatBot:Memories:Endpoint=http://localhost:65535",
         $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
     ];
 
@@ -543,8 +544,7 @@ public sealed class RecoveryValidationTopologyContractTests
             .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
             .ToHashSet(StringComparer.Ordinal);
 
-        // Other AppHost builders in this assembly share the test process, so their owner markers have the same
-        // process id. A unique realm value identifies only the directory produced by this test.
+        // A unique realm value identifies this test among concurrent AppHost builders.
         string mailboxSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         string[] args = [.. RenderedRealmArgs];
         args[0] = $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={mailboxSecret}";
@@ -559,11 +559,10 @@ public sealed class RecoveryValidationTopologyContractTests
             // assembly disables xUnit collection parallelism, and several other classes build
             // DistributedApplicationTestingBuilder topologies in the same process. A marker alone matches all of
             // them; a bare SingleOrDefault() would throw on a concurrent run's directory.
-            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
             string[] candidates = [.. Directory
                 .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
                 .Except(before, StringComparer.Ordinal)
-                .Where(directory => OwnerMarkerStartsWith(directory, ownerPrefix))
+                .Where(KeycloakRealmOwner.HasKnownMarker)
                 .Where(directory => RenderedRealmContains(directory, mailboxSecret))];
             candidates.Length.ShouldBe(
                 1,
@@ -605,76 +604,114 @@ public sealed class RecoveryValidationTopologyContractTests
     [Fact]
     public async Task PrepareKeycloakRealmImportSweepsAbandonedRealmDirectoriesAndSparesLiveOnes()
     {
-        // The sweep decides liveness from the recorded owner process, never from modification time. The realm file
-        // is written once and never touched again, so an mtime gate deleted the secret-bearing directory of any
-        // session outliving its threshold -- including the multi-hour recovery lane and a concurrent test class.
-        // Both directions are asserted: without the "spares live ones" half, inverting the gate would still pass.
         string tempPath = Path.GetTempPath();
         string abandoned = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
         string live = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
         string unreadable = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+        string legacy = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
         string markerless = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
 
-        // A WELL-FORMED marker naming a process that no longer exists. This is the case the sweep exists for and
-        // the one the PID-liveness design was chosen to detect; the previous fixture used an unparseable string,
-        // which only ever exercised the parse-failure branch and left Process.GetProcessById untested.
-        await File.WriteAllTextAsync(
-            Path.Combine(abandoned, "owner.marker"),
-            string.Create(CultureInfo.InvariantCulture, $"{DeadProcessId()}:{DateTimeOffset.UtcNow.AddHours(-2):O}"),
-            TestContext.Current.CancellationToken).ConfigureAwait(true);
-
-        // Unreadable and absent markers are NOT evidence of abandonment. A marker is written non-atomically only
-        // for an instant, but a concurrently starting AppHost reading it in that instant must not delete a live
-        // run's secret-bearing directory -- the race the owner-marker scheme exists to remove.
+        KeycloakRealmOwner.Claim(abandoned).ShouldNotBeNull().Dispose();
+        using FileStream activeClaim = KeycloakRealmOwner.Claim(live).ShouldNotBeNull();
         await File.WriteAllTextAsync(
             Path.Combine(unreadable, "owner.marker"),
             "this-is-not-a-valid-owner-marker",
             TestContext.Current.CancellationToken).ConfigureAwait(true);
-        using (Process current = Process.GetCurrentProcess())
-        {
-            await File.WriteAllTextAsync(
-                Path.Combine(live, "owner.marker"),
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{current.Id}:{current.StartTime.ToUniversalTime():O}"),
-                TestContext.Current.CancellationToken).ConfigureAwait(true);
-        }
+        await File.WriteAllTextAsync(
+            Path.Combine(legacy, "owner.marker"),
+            $"99999999:{DateTimeOffset.UtcNow:O}",
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         HashSet<string> before = Directory
             .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
             .ToHashSet(StringComparer.Ordinal);
         string? generatedDirectory = null;
+        string mailboxSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string[] args = [.. RenderedRealmArgs];
+        args[0] = $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={mailboxSecret}";
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
             Directory.Exists(abandoned).ShouldBeFalse(
-                "a directory whose recorded owner process is gone must be swept.");
+                "a directory with a recognized, released claim must be swept.");
             Directory.Exists(live).ShouldBeTrue(
-                "a directory whose owner process is still running must never be swept, however old it is.");
+                "a directory with an open filesystem claim must survive.");
             Directory.Exists(unreadable).ShouldBeTrue(
                 "an unparseable marker is not evidence of abandonment; deleting on it races a marker being written.");
+            Directory.Exists(legacy).ShouldBeTrue("a PID-based marker cannot establish abandonment across namespaces.");
             Directory.Exists(markerless).ShouldBeTrue(
                 "a directory with no marker yet is a run that has just created it, and must be spared.");
 
-            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
             generatedDirectory = Directory
                 .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
                 .Except(before, StringComparer.Ordinal)
-                .FirstOrDefault(directory => OwnerMarkerStartsWith(directory, ownerPrefix));
+                .Where(KeycloakRealmOwner.HasKnownMarker)
+                .SingleOrDefault(directory => RenderedRealmContains(directory, mailboxSecret));
             generatedDirectory.ShouldNotBeNull("this run must record its own owner marker.");
         }
         finally
         {
             await builder.DisposeAsync().ConfigureAwait(true);
-            foreach (string? directory in new[] { generatedDirectory, live, abandoned, unreadable, markerless })
+            foreach (string? directory in new[] { generatedDirectory, live, abandoned, unreadable, legacy, markerless })
             {
                 if (directory is not null && Directory.Exists(directory))
                 {
                     Directory.Delete(directory, recursive: true);
                 }
             }
+        }
+    }
+
+    /// <summary>Confirms a held claim survives another Linux process's view of the shared directory.</summary>
+    [Fact]
+    public async Task KeycloakRealmClaimShouldObserveOwnersInAnotherProcess()
+    {
+        const string Flock = "/usr/bin/flock";
+        Assert.SkipUnless(OperatingSystem.IsLinux() && File.Exists(Flock), "The cross-process check uses Linux flock.");
+        string directory = Directory.CreateTempSubdirectory("hexalith-realm-claim-test-").FullName;
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        Process? owner = null;
+        try
+        {
+            KeycloakRealmOwner.Claim(directory).ShouldNotBeNull().Dispose();
+            ProcessStartInfo start = new(Flock)
+            {
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            };
+            start.ArgumentList.Add("--shared");
+            start.ArgumentList.Add(Path.Combine(directory, "owner.marker"));
+            start.ArgumentList.Add("/bin/sh");
+            start.ArgumentList.Add("-c");
+            start.ArgumentList.Add("printf 'owned\n'; read -r unused");
+            owner = Process.Start(start).ShouldNotBeNull();
+            string? ready = await owner.StandardOutput.ReadLineAsync(cancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(true);
+            ready.ShouldBe("owned");
+            KeycloakRealmOwner.CanReclaim(directory).ShouldBeFalse();
+
+            await owner.StandardInput.WriteLineAsync("release").ConfigureAwait(true);
+            await owner.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(true);
+            owner.ExitCode.ShouldBe(0);
+            KeycloakRealmOwner.CanReclaim(directory).ShouldBeTrue();
+        }
+        finally
+        {
+            if (owner is not null)
+            {
+                if (!owner.HasExited)
+                {
+                    owner.Kill(entireProcessTree: true);
+                    await owner.WaitForExitAsync(CancellationToken.None).ConfigureAwait(true);
+                }
+
+                owner.Dispose();
+            }
+
+            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -788,22 +825,6 @@ public sealed class RecoveryValidationTopologyContractTests
             new ConfigurationBuilder().Build()));
     }
 
-    /// <summary>Returns a process id that is reliably not running, for the dead-owner sweep fixture.</summary>
-    /// <returns>An exited process's identifier.</returns>
-    private static int DeadProcessId()
-    {
-        // Start and reap a trivial process, then reuse its id: the id is genuinely gone, and unlike a guessed
-        // constant it cannot collide with a live process on the runner.
-        using Process probe = Process.Start(new ProcessStartInfo("dotnet", "--version")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        })!;
-        probe.WaitForExit();
-        return probe.Id;
-    }
-
     /// <summary>
     /// Renders every service-client grant expiry as a future canonical UTC value while proving that
     /// <c>ClaimsServiceClientGrantResolver</c> still requires authoritative grant dependencies.
@@ -822,17 +843,20 @@ public sealed class RecoveryValidationTopologyContractTests
             .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
             .ToHashSet(StringComparer.Ordinal);
 
+        string mailboxSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string[] args = [.. RenderedRealmArgs];
+        args[0] = $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={mailboxSecret}";
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         string? generatedDirectory = null;
         try
         {
-            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
             generatedDirectory = Directory
                 .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
                 .Except(before, StringComparer.Ordinal)
-                .FirstOrDefault(directory => OwnerMarkerStartsWith(directory, ownerPrefix));
+                .Where(KeycloakRealmOwner.HasKnownMarker)
+                .SingleOrDefault(directory => RenderedRealmContains(directory, mailboxSecret));
             generatedDirectory.ShouldNotBeNull("PrepareKeycloakRealmImport must render this run's realm.");
 
             using JsonDocument rendered = JsonDocument.Parse(
@@ -994,20 +1018,6 @@ public sealed class RecoveryValidationTopologyContractTests
             "test"));
 
         return new ChatBotAuthenticatedActor("service-account", principal, "service", clientId);
-    }
-
-    private static bool OwnerMarkerStartsWith(string directory, string ownerPrefix)
-    {
-        string markerPath = Path.Combine(directory, "owner.marker");
-        try
-        {
-            return File.Exists(markerPath)
-                && File.ReadAllText(markerPath).StartsWith(ownerPrefix, StringComparison.Ordinal);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
     }
 
     private static bool RenderedRealmContains(string directory, string mailboxSecret)

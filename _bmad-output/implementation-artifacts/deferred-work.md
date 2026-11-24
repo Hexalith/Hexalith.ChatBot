@@ -1140,7 +1140,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: src/Hexalith.ChatBot.AppHost/Program.cs:342-355
 severity: medium
 reason: **[MEDIUM · reliability] Keycloak owner-marker liveness is pid-namespace-local and carries no host discriminator.** `owner.marker` records only `{pid}:{startTime}` (`src/Hexalith.ChatBot.AppHost/Program.cs:342-355`), and `IsKeycloakRealmOwnerAlive` resolves it with `Process.GetProcessById` (`:420-430`). **Not covered:** on a host where the temp directory is shared across pid namespaces (a mounted `/tmp` in CI containers) or survives a reboot (Windows `%TEMP%`), a foreign pid can either alias a live local process — sparing an abandoned directory forever — or mismatch and cause a live directory to be deleted. **Why deferred:** the marker scheme is a strict improvement on the modification-time proxy it replaced, and adding a boot-id/machine-id discriminator is a separate design step rather than a fix to this change. **Owner:** ChatBot AppHost composition. **Closure evidence:** the marker records a namespace-independent owner token and the sweep treats any unrecognised token as live, with a test for each direction.
-status: open
+status: done 2026-11-24
+resolution: A recognized filesystem ownership marker holds a claim for each running realm. Reclamation requires a supported exclusive share operation and a released claim. Tests cover live, released, missing, malformed and legacy markers.
 
 ### DW-124: [MEDIUM · evidence-integrity] The per-lane freshness ceiling is keyed on a contract-author-controlled lane name with no allowlist.
 
