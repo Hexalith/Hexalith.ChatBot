@@ -143,15 +143,20 @@ internal static class ChatBotCompatibilityEndpointExtensions
         string topic = binding.Topic;
         string deadLetterTopic = binding.DeadLetterTopic;
         _ = app.MapSubscribeHandler().RequireEventStoreSidecarChannel();
-        _ = app.MapGovernedOperationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapMailboxIntakeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapAssociationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapParticipantResolutionProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapAiOutcomeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapTaskIntentProjectionEndpoints(pubSubName, topic, deadLetterTopic);
-        _ = app.MapApprovalProjectionEndpoints(pubSubName, topic, deadLetterTopic);
 
-        // The seven subscriptions above all route poison messages to deadLetterTopic. Drain it: without a
+        // Dapr's subscribe handler keeps only the first default route per pub/sub topic, so one fan-out route carries
+        // the topic subscription and runs every projection family. The family routes stay mapped and sidecar-guarded
+        // without subscriptions of their own.
+        _ = app.MapChatBotProjectionFanOutEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapGovernedOperationProjectionEndpoints();
+        _ = app.MapMailboxIntakeProjectionEndpoints();
+        _ = app.MapAssociationProjectionEndpoints();
+        _ = app.MapParticipantResolutionProjectionEndpoints();
+        _ = app.MapAiOutcomeProjectionEndpoints();
+        _ = app.MapTaskIntentProjectionEndpoints();
+        _ = app.MapApprovalProjectionEndpoints();
+
+        // The fan-out subscription above routes poison messages to deadLetterTopic. Drain it: without a
         // subscriber those messages accumulate in Redis with nothing observing or alerting on them.
         _ = app.MapChatBotDeadLetterProjectionEndpoints(pubSubName, deadLetterTopic);
 

@@ -426,22 +426,32 @@ public static class AppHostTopologyTests
             $"?? \"{SharedDeadLetterTopicDefault}\"",
             customMessage: "The dead-letter topic default must not be re-hardcoded as an unshared fallback at the call site.");
 
-        // EVERY subscriber, not just the governed-operation one: six subscribers previously could drop
-        // DeadLetterTopic with nothing failing. Discovered from disk so an eighth subscriber is covered the day
-        // it is added.
-        string[] subscriberFiles = [.. Directory
+        // ONE subscriber carries the shared topic: Dapr.AspNetCore keeps only the first default route per pub/sub
+        // topic, so a second family route subscribing to it silently stops receiving events. The fan-out subscription
+        // routes poison messages to the configured dead-letter topic and runs every projection family. Families are
+        // discovered from disk so an eighth one is covered the day it is added.
+        string fanOutSubscriber = File.ReadAllText(Path.Combine(projectionsDirectory, "ChatBotProjectionFanOutEndpoints.cs"));
+        fanOutSubscriber.ShouldContain(
+            "DeadLetterTopic = deadLetterTopic",
+            customMessage: "The fan-out subscription must route poison messages to the configured dead-letter topic.");
+        endpoints.ShouldContain("MapChatBotProjectionFanOutEndpoints(pubSubName, topic, deadLetterTopic)");
+        string[] familyFiles = [.. Directory
             .EnumerateFiles(projectionsDirectory, "*ProjectionEndpoints.cs", SearchOption.AllDirectories)
             .Where(static path => !Path.GetFileName(path).StartsWith("ChatBotDeadLetter", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)];
-        subscriberFiles.Length.ShouldBe(
+        familyFiles.Length.ShouldBe(
             7,
-            "The ChatBot projection subscriber set changed; confirm the new subscriber routes to the dead-letter "
-            + "topic and update this count deliberately.");
-        foreach (string subscriberFile in subscriberFiles)
+            "The ChatBot projection family set changed; confirm the fan-out route runs the new family and update "
+            + "this count deliberately.");
+        foreach (string familyFile in familyFiles)
         {
-            File.ReadAllText(subscriberFile).ShouldContain(
-                "DeadLetterTopic = deadLetterTopic",
-                customMessage: $"{Path.GetFileName(subscriberFile)} must route poison messages to the configured dead-letter topic.");
+            string family = Path.GetFileNameWithoutExtension(familyFile);
+            File.ReadAllText(familyFile).ShouldNotContain(
+                "WithTopic",
+                customMessage: $"{family} must not subscribe to the shared topic; the fan-out subscription runs it.");
+            fanOutSubscriber.ShouldContain(
+                family + ".ProjectAsync(",
+                customMessage: $"The fan-out subscription must run {family}.");
         }
 
         // ... and the dead-letter topic is actually drained, on its own subscription with no dead-letter topic of
