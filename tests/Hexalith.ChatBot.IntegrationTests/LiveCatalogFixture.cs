@@ -121,15 +121,9 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
             foreach (DaprSidecarAnnotation sidecar in project.Annotations.OfType<DaprSidecarAnnotation>())
             {
                 DaprSidecarOptionsAnnotation options = sidecar.Sidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single();
-                object document = new DeserializerBuilder().WithAttemptingUnquotedStringTypeDeserialization().Build()
-                    .Deserialize<object>(File.ReadAllText(options.Options.Config ?? throw new InvalidOperationException("The selected sidecar lacks its configuration.")));
-                JsonObject configuration = JsonNode.Parse(new SerializerBuilder().JsonCompatible().Build().Serialize(document))!.AsObject();
-                configuration["spec"]!["mtls"] = new JsonObject { ["enabled"] = true };
-                configuration["spec"]!["nameResolution"] = new JsonObject
-                {
-                    ["component"] = "sqlite", ["version"] = "v1",
-                    ["configuration"] = new JsonObject { ["connectionString"] = Path.Combine(_directory, "discovery.db") },
-                };
+                string source = options.Options.Config ?? throw new InvalidOperationException("The selected sidecar lacks its configuration.");
+                JsonObject configuration = PrepareSidecarConfiguration(
+                    File.ReadAllText(source), Path.Combine(_directory, "discovery.db"));
                 string path = Path.Combine(_directory, project.Name + ".configuration.json");
                 await WritePrivateAsync(path, JsonSerializer.SerializeToUtf8Bytes(configuration), cancellationToken).ConfigureAwait(false);
                 sidecar.Sidecar.Annotations[sidecar.Sidecar.Annotations.IndexOf(options)] = new DaprSidecarOptionsAnnotation(options.Options with { Config = path });
@@ -245,6 +239,36 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
             "Tenants__BootstrapBoundWorkloadReceiptPath",
             Path.Combine(_catalog.Directory, "tenants.bootstrap.json"));
         builder.Services.AddSingleton<LiveCatalogFixture>(_ => this);
+    }
+
+    /// <summary>Applies the fixture's mTLS and isolated discovery settings to a sidecar configuration.</summary>
+    internal static JsonObject PrepareSidecarConfiguration(string yaml, string discoveryDatabase)
+    {
+        object? document = new DeserializerBuilder().WithAttemptingUnquotedStringTypeDeserialization().Build()
+            .Deserialize<object>(yaml);
+        if (JsonNode.Parse(new SerializerBuilder().JsonCompatible().Build().Serialize(document)) is not JsonObject configuration)
+        {
+            throw new InvalidOperationException("The selected sidecar configuration must be an object.");
+        }
+
+        if (!configuration.TryGetPropertyValue("spec", out JsonNode? configuredSpec))
+        {
+            configuredSpec = new JsonObject();
+            configuration["spec"] = configuredSpec;
+        }
+
+        if (configuredSpec is not JsonObject spec)
+        {
+            throw new InvalidOperationException("The selected sidecar configuration spec must be an object.");
+        }
+
+        spec["mtls"] = new JsonObject { ["enabled"] = true };
+        spec["nameResolution"] = new JsonObject
+        {
+            ["component"] = "sqlite", ["version"] = "v1",
+            ["configuration"] = new JsonObject { ["connectionString"] = discoveryDatabase },
+        };
+        return configuration;
     }
 
     /// <summary>Retains genuine custody until the application stops, then removes only this fixture's backend and private inputs.</summary>

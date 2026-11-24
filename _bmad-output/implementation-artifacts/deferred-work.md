@@ -2238,6 +2238,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: live catalog setup may throw if a Dapr sidecar YAML has no `spec` object.
   evidence: Would be settled by a sidecar `Config` whose deserialized JSON lacks `spec`, hitting `LiveCatalogFixture.cs:120`.
+  resolution: Resolved 2026-11-24. Live catalog setup initializes an omitted spec, applies its isolated mTLS and discovery configuration, and refuses invalid spec shapes with a stable diagnostic. Regression tests cover the configuration variants.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: blank tenant or intake ids may inventory colliding read-model keys.
