@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
@@ -48,8 +49,9 @@ public sealed partial class AiExecutionCoordinatorTests
         durable.AfterSave = key => { if (key == original.Key && boundary == "completed-write") { clock.UtcNow += TimeSpan.FromSeconds(2); } };
         using WebApplicationFactory<Program> factory = RecoveryFactory(clock, owner, store);
         using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { Key = original.Key }, TestContext.Current.CancellationToken);
-        response.StatusCode.ShouldBe(boundary == "completed-write" ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(boundary == "completed-write" ? HttpStatusCode.OK : HttpStatusCode.Forbidden);
         durable.AfterRead = null;
         AiExecutionWorkItem persisted = (await durable.GetAsync<AiExecutionWorkItem>("chatbot-state", original.Key, TestContext.Current.CancellationToken)).Value!;
         if (boundary == "completed-write")
@@ -66,6 +68,7 @@ public sealed partial class AiExecutionCoordinatorTests
             persisted.ShouldBe(original);
             durable.SaveAttempts.Count.ShouldBe(boundary == "cas-retry" ? 1 : 0);
             (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldNotContain(original.Key);
+            await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(response, client);
         }
     }
 
@@ -90,13 +93,29 @@ public sealed partial class AiExecutionCoordinatorTests
         };
         using WebApplicationFactory<Program> factory = RecoveryFactory(clock, owner, store);
         using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
         using HttpResponseMessage response = await client.GetAsync("/api/v1/operations/ai-executions/exhausted", TestContext.Current.CancellationToken);
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         durable.ReadKeys.Count(key => key == original.Key || key == second.Key).ShouldBe(boundary == "index" ? 0 : 1);
         (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldNotContain(original.Key);
+        await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(response, client);
         durable.AfterRead = null;
         (await durable.GetAsync<AiExecutionWorkItem>("chatbot-state", original.Key, TestContext.Current.CancellationToken)).Value.ShouldBe(original);
         (await durable.GetAsync<AiExecutionWorkItem>("chatbot-state", second.Key, TestContext.Current.CancellationToken)).Value.ShouldBe(second);
+    }
+
+    /// <summary>An undecodable listing cursor returns the catalog validation problem before any store access.</summary>
+    [Fact]
+    public async Task ExhaustedListingRejectsUndecodableCursorWithCatalogValidationProblem()
+    {
+        TrustedAuthorityClock clock = new();
+        IAiExecutionWorkStore store = DispatchProxy.Create<IAiExecutionWorkStore, ProtectedAccessProbe>();
+        using WebApplicationFactory<Program> factory = RecoveryFactory(clock, new SyntheticOwnerAuthorityProvider(clock), store);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
+        using HttpResponseMessage response = await client.GetAsync("/api/v1/operations/ai-executions/exhausted?cursor=not-a-cursor", TestContext.Current.CancellationToken);
+        await AiExecutionRecoveryProblemAssertions.ShouldBeValidationProblemAsync(response);
+        ((ProtectedAccessProbe)(object)store).Calls.ShouldBe(0);
     }
 
     private static WebApplicationFactory<Program> RecoveryFactory(TrustedAuthorityClock clock, SyntheticOwnerAuthorityProvider owner, IAiExecutionWorkStore store)

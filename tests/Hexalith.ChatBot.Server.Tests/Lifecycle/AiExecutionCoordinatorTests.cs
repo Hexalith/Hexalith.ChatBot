@@ -675,11 +675,13 @@ public sealed partial class AiExecutionCoordinatorTests
         (await store.TryClaimAsync(foreign.Key, "operator-test-owner", Now, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken)).ShouldNotBeNull();
         (await store.MarkExhaustedAsync(foreign.Key, "operator-test-owner", Now, "test-exhaustion", TestContext.Current.CancellationToken)).ShouldBeTrue();
         using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
         using HttpResponseMessage forbidden = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = foreign.Key }, TestContext.Current.CancellationToken);
         using HttpResponseMessage missing = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = "missing-key" }, TestContext.Current.CancellationToken);
-        forbidden.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
+        forbidden.StatusCode.ShouldBe(System.Net.HttpStatusCode.Forbidden);
         missing.StatusCode.ShouldBe(forbidden.StatusCode);
         (await forbidden.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await missing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(missing, client);
         (await store.ListExhaustedAsync(null, 200, TestContext.Current.CancellationToken, "tenant-beta")).ShouldHaveSingleItem().Key.ShouldBe(foreign.Key);
         List<string> keys = [];
         string? cursor = null;

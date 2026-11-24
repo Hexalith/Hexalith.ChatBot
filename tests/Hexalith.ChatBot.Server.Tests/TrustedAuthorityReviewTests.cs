@@ -15,6 +15,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Tests.Lifecycle;
 using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Contracts.Commands;
@@ -410,15 +411,18 @@ public sealed class TrustedAuthorityReviewTests
             foreach (ServiceDescriptor descriptor in services.Where(static descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray()) { services.Remove(descriptor); }
         }));
         using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
         using HttpResponseMessage list = await client.GetAsync("/api/v1/operations/ai-executions/exhausted", TestContext.Current.CancellationToken);
         using HttpResponseMessage recover = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = "foreign-key" }, TestContext.Current.CancellationToken);
         // The conforming host denies an anonymous caller at the boundary (401); an authenticated non-owner still gets
-        // the existence-neutral 404 from the recovery guard. Neither path reaches the store.
-        list.StatusCode.ShouldBe(authenticated ? HttpStatusCode.NotFound : HttpStatusCode.Unauthorized);
+        // the read routes' existence-neutral safe-not-found problem from the recovery guard. Neither path reaches the store.
+        list.StatusCode.ShouldBe(authenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
         recover.StatusCode.ShouldBe(list.StatusCode);
         if (authenticated)
         {
             (await recover.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await list.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(list, client);
+            await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(recover, client);
         }
         ((ProtectedAccessProbe)(object)store).Calls.ShouldBe(0);
     }
@@ -523,10 +527,11 @@ public sealed class TrustedAuthorityReviewTests
             foreach (ServiceDescriptor descriptor in services.Where(static descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray()) { services.Remove(descriptor); }
         }));
         using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Correlation-Id", AiExecutionRecoveryProblemAssertions.CorrelationId);
         using HttpResponseMessage response = await client.PostAsync("/api/v1/operations/ai-executions/exhausted/recover",
             new StringContent(payload, System.Text.Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldContain(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        await AiExecutionRecoveryProblemAssertions.ShouldBeReadRouteSafeNotFoundAsync(response, client);
         ((ProtectedAccessProbe)(object)store).Calls.ShouldBe(0);
     }
 
