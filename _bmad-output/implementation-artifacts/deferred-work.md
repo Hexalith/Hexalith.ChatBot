@@ -1976,6 +1976,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: U1-V1 — Assert every prepared MSBuild import variable in the source-wrapper child process test (medium; build tooling verification owner).
   evidence: .github/scripts/tests/test_story_evidence_guards.py:370-392 observes only Configuration, mapping hash, cwd and exit status. The reviewer ran both SourceMappingWrapperTests successfully against a temporary wrapper that removed all five IMPORTS variables before launching the child, proving the current tests miss loss of the prepared source graph. The production wrapper correctly forwards those imports and the current mapped Debug build passes. Extend the existing child-observation assertion; do not weaken producer validation or source/package duplicate guards.
+  resolution: Resolved 2026-11-24. A standalone wrapper regression checks the exact five MSBuild import paths in a child process, together with the mapping hash, Debug configuration, inherited environment and child exit code.
 
 ## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-01, round 13)
 
