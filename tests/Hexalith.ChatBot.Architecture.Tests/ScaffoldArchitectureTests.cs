@@ -1235,6 +1235,19 @@ public static class ScaffoldArchitectureTests
             project.Descendants("IsPublishable").Single().Value.ShouldBe("true");
             project.Descendants("EnableContainer").Single().Value.ShouldBe("true");
             project.Descendants("ContainerRepository").Single().Value.ShouldBe(containerId);
+
+            using JsonDocument publish = PackageCatalogTestHelper.EvaluateReleasePublishFiles(Path.Combine(root, projectPath));
+            JsonElement publishFiles = publish.RootElement.GetProperty("Items").GetProperty("ResolvedFileToPublish");
+            publishFiles.GetArrayLength().ShouldBeGreaterThan(0);
+            foreach (JsonElement file in publishFiles.EnumerateArray())
+            {
+                const string localAcl = "accesscontrol.local.yaml";
+                string source = file.GetProperty("FullPath").GetString()!;
+                string target = file.GetProperty("RelativePath").GetString()!.Replace('\\', '/');
+                (string.Equals(Path.GetFileName(source), localAcl, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileName(target), localAcl, StringComparison.OrdinalIgnoreCase))
+                    .ShouldBeFalse($"{containerId} would publish '{source}' as '{target}'.");
+            }
         }
 
     }

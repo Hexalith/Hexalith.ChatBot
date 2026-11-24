@@ -143,6 +143,21 @@ internal static class PackageCatalogTestHelper
             ],
             clearModeEnvironment: true);
 
+    /// <summary>Computes the SDK's actual publish-bound file set for a Release package-mode project.</summary>
+    public static JsonDocument EvaluateReleasePublishFiles(string projectPath)
+        => EvaluateWithMsBuild(
+            projectPath,
+            [
+                "-property:Configuration=Release",
+                "-property:UseHexalithProjectReferences=false",
+                "-property:NoBuild=true",
+                "-target:ComputeFilesToPublish",
+                "-getItem:ResolvedFileToPublish",
+                "-maxCpuCount:1",
+                "-nodeReuse:false",
+            ],
+            clearModeEnvironment: true);
+
     private static JsonDocument EvaluateWithMsBuild(
         string projectPath, IReadOnlyList<string> arguments, bool clearModeEnvironment = false)
     {

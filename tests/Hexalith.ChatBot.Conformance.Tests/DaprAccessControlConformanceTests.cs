@@ -51,6 +51,20 @@ public static partial class DaprAccessControlConformanceTests
         "/admin/operational-index-metadata",
     ];
 
+    /// <summary>The retained self-hosted topology uses an allow-by-default configuration without caller policies.</summary>
+    [Fact]
+    public static void LocalAccessControlMustRemainPolicyFree()
+    {
+        YamlMappingNode root = LoadConfiguration("accesscontrol.local.yaml");
+        Scalar(root, "kind").ShouldBe("Configuration");
+        Scalar(Mapping(root, "metadata"), "name").ShouldBe("chatbot-accesscontrol-local");
+
+        YamlMappingNode accessControl = Mapping(Mapping(root, "spec"), "accessControl");
+        Scalar(accessControl, "defaultAction").ShouldBe("allow");
+        Scalar(accessControl, "trustDomain").ShouldBe("public");
+        accessControl.Children.ContainsKey(new YamlScalarNode("policies")).ShouldBeFalse();
+    }
+
     [Fact]
     public static void ChatBotAccessControlMustBeDenyByDefaultAndNotCopyFoldersAllowPolicy()
     {
@@ -176,19 +190,21 @@ public static partial class DaprAccessControlConformanceTests
     private static partial Regex MappedPostRouteRegex();
 
     private static YamlMappingNode LoadAccessControl()
+        => Mapping(Mapping(LoadConfiguration("accesscontrol.yaml"), "spec"), "accessControl");
+
+    private static YamlMappingNode LoadConfiguration(string fileName)
     {
         string policyPath = Path.Combine(
             RepositoryRoot(),
             "src",
             "Hexalith.ChatBot.AppHost",
             "DaprComponents",
-            "accesscontrol.yaml");
+            fileName);
         using StreamReader reader = File.OpenText(policyPath);
         YamlStream yaml = new();
         yaml.Load(reader);
 
-        YamlMappingNode root = (YamlMappingNode)yaml.Documents.Single().RootNode;
-        return Mapping(Mapping(root, "spec"), "accessControl");
+        return (YamlMappingNode)yaml.Documents.Single().RootNode;
     }
 
     private static YamlMappingNode Mapping(YamlMappingNode parent, string key)

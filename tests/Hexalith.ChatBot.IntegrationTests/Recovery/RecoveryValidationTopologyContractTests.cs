@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Xml.Linq;
 
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -401,6 +402,39 @@ public sealed class RecoveryValidationTopologyContractTests
             eventStoreEnvironment["Authentication__DaprInternal__AllowedCallers__0"].ShouldBe(effectiveChatBotId);
             eventStoreEnvironment["EventStore__DomainServices__Registrations__wildcard_chatbot_v1__AppId"].ShouldBe(effectiveChatBotId);
             eventStoreEnvironment["EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain"].ShouldBe("chatbot");
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>The local ACL is selected on the retained sidecars and stays outside the deployable composition.</summary>
+    [Fact]
+    public async Task RecoveryTopologyKeepsLocalDaprConfigInTheNonPublishableAppHost()
+    {
+        const string appHostProject = "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj";
+        const string localConfig = "accesscontrol.local.yaml";
+        string root = RepositoryRoot();
+        string appHostPath = Path.Combine(root, appHostProject);
+        string configPath = Path.Combine(Path.GetDirectoryName(appHostPath)!, "DaprComponents", localConfig);
+        File.Exists(configPath).ShouldBeTrue();
+        XDocument.Load(appHostPath).Descendants("IsPublishable").ShouldHaveSingleItem().Value.ShouldBe("false");
+
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            var selected = builder.Resources
+                .SelectMany(resource => resource.Annotations.OfType<DaprSidecarAnnotation>()
+                    .Select(sidecar => (resource.Name, sidecar.Sidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single().Options)))
+                .ToArray();
+            selected.ShouldContain(static sidecar => sidecar.Name == "chatbot");
+            foreach ((string name, DaprSidecarOptions options) in selected)
+            {
+                options.Config.ShouldBe(configPath, name);
+            }
         }
         finally
         {

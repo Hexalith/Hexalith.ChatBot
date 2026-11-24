@@ -1099,6 +1099,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: `accesscontrol.local.yaml` — the only access-control file the repo actually exercises — has no conformance guard that it stays policy-free and local-only.
   evidence: Its entire coverage is two `ShouldContain` strings in `ScaffoldTopologySmokeTests.cs:39-40`. Pre-existing; the production-file guards added by this story deliberately did not extend to it.
+  resolution: Resolved 2026-11-24. The parsed local configuration stays policy-free. The app model selects it on the retained AppHost sidecars, and the declared release composition excludes the AppHost and its local configuration. The Dapr conformance and recovery topology test classes passed all 4 and 39 cases.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: The widened per-resource endpoint assertion may fail on URL-activation timing rather than a real fault for `security`, `chatbot-ui` and `eventstore-admin-ui`.
   evidence: maybe-false, would be medium if true. Static evidence cannot establish whether `WaitForResourceHealthyAsync` guarantees a resolved active URL for those three at the moment health flips. A live Tier-3 run recording `ASPIRE_RESOURCE_EVIDENCE` for all seven resources settles it.
