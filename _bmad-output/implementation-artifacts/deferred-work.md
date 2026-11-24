@@ -605,6 +605,7 @@ location: PeriodicEnforcementRuntime.cs:181-193,321-323,690-718
 severity: medium
 reason: **[MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.** `PeriodicEnforcementRuntime.cs:181-193,321-323,690-718` keeps last-run state, cadence partitions, and non-overlap guards in memory. Restarts reset the evidence window and horizontally scaled replicas can execute the same global sweep and duplicate writes/alerts. The current story explicitly modeled the in-memory once-per-day guard, so distributed leasing/durable status belongs to the deployment/scale owner before the server runs with multiple replicas.
 status: open
+triage: 2026-11-24 Skipped. Requires a shared cadence store and distributed fencing through audit and alert side effects plus replica validation.
 decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
 decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
 
@@ -721,7 +722,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establi
 location: n/a
 severity: medium
 reason: **[MEDIUM · residual, Story 13.8 scope] Fixture-based forced-colors/visual E2E still assert `.chatbot-status__label`.** 30+ hand-authored fixtures in `GovernedOperationsVisualFoundationE2ETests` emit a class the live `ChatBotStatusBanner` (now `FluentMessageBar`) no longer renders. This review de-tautologized the two assertions commit `9462de3` directly weakened (browser-path redundant line + no-browser self-reference); fully retiring the fixture-theater and moving status-cue forced-colors verification to the live-render suite is Story 13.8 (live cross-surface reverification) scope. **Concrete hard failure now surfaced (Story 13.1 verify-and-close, 2026-07-21):** `GovernedOperationsVisualFoundationE2ETests.AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates` (`:1243`) asserts `borderTopStyle === "solid"` on a candidate radio, but the CSS retirement deleted that `.chatbot-*` border rule so it now computes `none` — the fixture, not the live app, is stale. **Deterministic and pre-existing at committed HEAD `e91503b`** (reproduced with the Story 13.1 test change path-scoped-stashed: `Expected: solid / Actual: none`, same result), so it is NOT a Story 13.1 regression and does not gate 13.1. The full `Hexalith.ChatBot.UI.E2E.Tests` project is therefore **140 passed / 1 failed / 0 skipped**, the single failure being this Story-13.8-owned stale fixture. Story 13.8 must fix/retire this fixture assertion when it retires the theater.
-status: open
+status: done 2026-11-24
+resolution: Replaced stale forced-colors and motion assumptions with live browser cases on association and governed operations. The remaining evidence/redaction fixtures no longer assert the deleted status label or radio border.
 
 ### DW-78: [LOW] Retrospective doc conflates multi-commit "13.1 review" corrections.
 

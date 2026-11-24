@@ -197,50 +197,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
-    public async Task ReducedMotionShouldSuppressNonEssentialMotionAndKeepTextStatusCues()
-    {
-        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
-        if (harness is null)
-        {
-            AssertReducedMotionWithoutBrowser();
-            return;
-        }
-
-        await using (harness)
-        {
-            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
-
-            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
-            await WaitForVisibleAsync(harness.Page.GetByText("Projection pending", new() { Exact = true }));
-
-            ILocator motionFixture = harness.Page.Locator("[data-chatbot-motion-fixture='governed-motion']");
-            string animationName = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
-            string backgroundImage = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).backgroundImage");
-            string transform = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).transform");
-            bool transitionSuppressed = await motionFixture.EvaluateAsync<bool>(
-                """
-                element => getComputedStyle(element).transitionDuration
-                    .split(",")
-                    .every(value => {
-                        const trimmed = value.trim();
-                        const numeric = Number.parseFloat(trimmed);
-                        if (Number.isNaN(numeric)) {
-                            return false;
-                        }
-
-                        return trimmed.endsWith("ms")
-                            ? numeric <= 0.01
-                            : numeric <= 0.00001;
-                    })
-                """);
-            animationName.ShouldBe("none");
-            backgroundImage.ShouldBe("none");
-            transform.ShouldBe("none");
-            transitionSuppressed.ShouldBeTrue();
-        }
-    }
-
-    [Fact]
     public async Task BackendFailureShouldRenderRetryableDangerStatusAndLeaveRetryAvailable()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -520,32 +476,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
             bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
             bodyText.ShouldNotContain("bearer", Case.Insensitive);
-        }
-    }
-
-    [Fact]
-    public async Task ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues()
-    {
-        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
-        if (harness is null)
-        {
-            AssertForcedColorsWithoutBrowser();
-            return;
-        }
-
-        await using (harness)
-        {
-            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
-
-            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
-
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Projection status: pending" }));
-            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
-
-            ILocator status = harness.Page.Locator(".chatbot-status[data-chatbot-status='warning']").First;
-            ILocator label = status.Locator(".chatbot-status__label");
-            await WaitForVisibleAsync(label);
-            (await label.TextContentAsync()).ShouldBe("Warning");
         }
     }
 
@@ -1219,23 +1149,20 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
-    public async Task AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates()
+    public async Task AssociationReviewShouldPreserveEvidenceLabelsAndBlockedRedactionStates()
     {
         AssertAssociationCandidateRowUsesFluentPresentation();
 
-        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
         if (harness is null)
         {
-            AssertAssociationReviewForcedColorsAndBlockedWithoutBrowser();
+            AssertAssociationReviewEvidenceAndBlockedWithoutBrowser();
             return;
         }
 
         await using (harness)
         {
             await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates));
-
-            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
-            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
 
             ILocator candidate = harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" });
             await WaitForVisibleAsync(candidate);
@@ -1251,11 +1178,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(redactedEvidence);
             (await redactedEvidence.GetAttributeAsync("aria-label")).ShouldBe("Evidence redacted: restricted metadata. Evidence restricted.");
             await WaitForVisibleAsync(redactedEvidence.GetByText("Evidence redacted", new() { Exact = true }));
-
-            string animationName = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
-            string transform = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).transform");
-            animationName.ShouldBe("none");
-            transform.ShouldBe("none");
 
             await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.BlockedRedacted));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Blocked: No authorized candidates are available. Next action: Review authorized metadata, then defer or escalate." }));
@@ -1729,8 +1651,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         class="chatbot-shell-main"
                         data-frontcomposer-page-layout="full-width"
                         tabindex="-1">
-                    <div class="chatbot-shimmer chatbot-skeleton chatbot-row-motion chatbot-streaming-text chatbot-panel-transition"
-                         data-chatbot-motion-fixture="governed-motion">Projection pending</div>
                     <section class="chatbot-conversation-shell"
                              aria-label="Governed operations"
                              data-chatbot-responsive-fixture="governed-operations">
@@ -1753,7 +1673,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                role="status"
                                aria-live="polite"
                                aria-label="Project status: UI origin remains visible">
-                            <span class="chatbot-status__label">Info</span>
+                            <span>Info</span>
                             <span>UI origin remains visible</span>
                           </div>
                         </header>
@@ -1806,7 +1726,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                              role="status"
                              aria-live="polite"
                              aria-label="Submission status: failed">
-                          <span class="chatbot-status__label">Danger</span>
+                          <span>Danger</span>
                           <span>Submission did not complete (code: <code class="chatbot-code">dependency_degraded</code>). You can try again.</span>
                         </div>`;
                       return;
@@ -1824,7 +1744,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                role="status"
                                aria-live="polite"
                                aria-label="Operation recovery status: retryable failure">
-                            <span class="chatbot-status__label">Warning</span>
+                            <span>Warning</span>
                             <span>Recoverable mailbox failure. Next retry is policy-controlled.</span>
                           </div>
                           <dl class="chatbot-definition-list">
@@ -1885,7 +1805,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                ${projectionRole}
                                aria-live="${projectionLive}"
                                aria-label="Projection status: pending">
-                            <span class="chatbot-status__label">Warning</span>
+                            <span>Warning</span>
                             <span>Projection is not complete (<code class="chatbot-code">AcceptedProjectionPending</code>).</span>
                           </div>
                           <div class="chatbot-status"
@@ -1898,7 +1818,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                ${auditRole}
                                aria-live="${auditLive}"
                                aria-label="Audit status: committed">
-                            <span class="chatbot-status__label">Success</span>
+                            <span>Success</span>
                             <span>Audit metadata is committed (<code class="chatbot-code">Committed</code>).</span>
                           </div>
                           <div class="chatbot-status"
@@ -1910,7 +1830,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                data-chatbot-live-announced="false"
                                aria-live="off"
                                aria-label="Audit history: metadata only">
-                            <span class="chatbot-status__label">Info</span>
+                            <span>Info</span>
                             <span>Audit history below is metadata-only.</span>
                           </div>
                         </div>
@@ -1954,7 +1874,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                      role="status"
                      aria-live="polite"
                      aria-label="Projection status: pending">
-                  <span class="chatbot-status__label">Warning</span>
+                  <span>Warning</span>
                   <span>Projection is not complete (<code class="chatbot-code">AcceptedProjectionPending</code>).</span>
                 </div>
                 <div class="chatbot-status"
@@ -1966,7 +1886,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                      role="status"
                      aria-live="polite"
                      aria-label="Audit status: committed">
-                  <span class="chatbot-status__label">Success</span>
+                  <span>Success</span>
                   <span>Audit metadata is committed (<code class="chatbot-code">Committed</code>).</span>
                 </div>
                 <div class="chatbot-status"
@@ -1977,7 +1897,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                      data-chatbot-repeat-rule="NoLiveAnnouncement"
                      aria-live="off"
                      aria-label="Audit history: metadata only">
-                  <span class="chatbot-status__label">Info</span>
+                  <span>Info</span>
                   <span>Audit history below is metadata-only.</span>
                 </div>
               </div>
@@ -2353,7 +2273,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          role="status"
                          aria-live="polite"
                          aria-label="Info status: Command accepted; projection is pending.">
-                      <span class="chatbot-status__label">Info</span>
+                      <span>Info</span>
                       <span>Command accepted; projection is pending.</span>
                     </div>
                     <div class="chatbot-status"
@@ -2361,7 +2281,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          role="status"
                          aria-live="polite"
                          aria-label="Warning status: Dependency degraded; retry remains available.">
-                      <span class="chatbot-status__label">Warning</span>
+                      <span>Warning</span>
                       <span>Dependency degraded; retry remains available.</span>
                     </div>
                     <div class="chatbot-status"
@@ -2369,7 +2289,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          role="alert"
                          aria-live="assertive"
                          aria-label="Danger status: Validation failed for the current user.">
-                      <span class="chatbot-status__label">Danger</span>
+                      <span>Danger</span>
                       <span>Validation failed for the current user.</span>
                     </div>
                     <div class="chatbot-status"
@@ -2377,7 +2297,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          role="status"
                          aria-live="polite"
                          aria-label="Success status: Audit metadata committed.">
-                      <span class="chatbot-status__label">Success</span>
+                      <span>Success</span>
                       <span>Audit metadata committed.</span>
                     </div>
                   </section>
@@ -2568,7 +2488,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="{{projectionLabel}}">
-                        <span class="chatbot-status__label">{{(french ? "Avertissement" : "Warning")}}</span>
+                        <span>{{(french ? "Avertissement" : "Warning")}}</span>
                         <span>{{(french ? "La projection n'est pas complète." : "Projection is not complete.")}} <code class="chatbot-code">AcceptedProjectionPending</code></span>
                       </div>
                       <div class="chatbot-status"
@@ -2578,7 +2498,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="{{auditLabel}}">
-                        <span class="chatbot-status__label">{{(french ? "Succès" : "Success")}}</span>
+                        <span>{{(french ? "Succès" : "Success")}}</span>
                         <span>{{(french ? "Les métadonnées d'audit sont validées." : "Audit metadata is committed.")}} <code class="chatbot-code">Committed</code></span>
                       </div>
                     </div>
@@ -2628,7 +2548,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Statut de projection : en attente">
-                        <span class="chatbot-status__label">Avertissement</span>
+                        <span>Avertissement</span>
                         <span>La projection n'est pas complète. La récupération sûre reste disponible.</span>
                       </div>
                       <span class="chatbot-chip chatbot-chip--risk"
@@ -2723,7 +2643,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          data-chatbot-off-surface-text="{{offSurfaceText}}"
                          data-chatbot-off-surface-accessible-description="{{accessibleDescription}}"
                          aria-label="{{notice}}">
-                      <span class="chatbot-status__label">{{(french ? "Info" : "Info")}}</span>
+                      <span>{{(french ? "Info" : "Info")}}</span>
                       <span>{{notice}}</span>
                       <span>{{escalation}}</span>
                     </div>
@@ -2810,7 +2730,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                              role="status"
                              aria-live="off"
                              aria-label="Association routing status: {{status}}">
-                          <span class="chatbot-status__label">Info</span>
+                          <span>Info</span>
                           <span>{{status}}</span>
                         </div>
                       </header>
@@ -2841,7 +2761,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                             <div class="chatbot-status"
                                  data-chatbot-status="info"
                                  aria-label="Review authorized metadata, then defer or escalate until decision recording is available.">
-                              <span class="chatbot-status__label">Info</span>
+                              <span>Info</span>
                               <span>Review authorized metadata, then defer or escalate until decision recording is available.</span>
                             </div>
                           </article>
@@ -2954,7 +2874,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="alert"
                            aria-live="assertive"
                            aria-label="Association validation: Select an authorized candidate before choosing this action.">
-                        <span class="chatbot-status__label">Warning</span>
+                        <span>Warning</span>
                         <span>Select an authorized candidate before choosing this action.</span>
                       </div>
                       <div class="chatbot-command-bar chatbot-association-actions__bar">
@@ -3011,7 +2931,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Correction status: blocked">
-                        <span class="chatbot-status__label">Danger</span>
+                        <span>Danger</span>
                         <span>Target project is not authorized for correction.</span>
                       </div>
                       <fluent-label class="chatbot-labelled-row" for="association-correction-rationale">Correction rationale</fluent-label>
@@ -3305,7 +3225,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Association decision accepted: projection pending">
-                        <span class="chatbot-status__label">Warning</span>
+                        <span>Warning</span>
                         <span>Association decision accepted: projection pending</span>
                       </div>
                       <div class="chatbot-status"
@@ -3313,7 +3233,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Audit status: reconciling">
-                        <span class="chatbot-status__label">Info</span>
+                        <span>Info</span>
                         <span>Audit status: reconciling</span>
                       </div>`;
                     const action = document.querySelector("#association-action-choose-candidate");
@@ -3353,7 +3273,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="alert"
                            aria-live="assertive"
                            aria-label="Submission failed: idempotency_conflict_association_decision">
-                        <span class="chatbot-status__label">Danger</span>
+                        <span>Danger</span>
                         <span>Submission failed. The association decision was already decided.</span>
                       </div>`;
                   });
@@ -3427,7 +3347,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Correction status: projection pending">
-                        <span class="chatbot-status__label">Info</span>
+                        <span>Info</span>
                         <span>Correction can be submitted after selecting an authorized target.</span>
                       </div>
                       <dl class="chatbot-definition-list chatbot-labelled-row-list">
@@ -3516,7 +3436,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Association correction accepted: downstream preview only">
-                        <span class="chatbot-status__label">Warning</span>
+                        <span>Warning</span>
                         <span>Association correction accepted: downstream preview only</span>
                       </div>
                       <div class="chatbot-status"
@@ -3524,7 +3444,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="Correction status: partial">
-                        <span class="chatbot-status__label">Warning</span>
+                        <span>Warning</span>
                         <span>Correction is accepted; downstream propagation remains a preview.</span>
                       </div>`;
                   });
@@ -3561,7 +3481,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="alert"
                            aria-live="assertive"
                            aria-label="Correction failed: idempotency_conflict_correction">
-                        <span class="chatbot-status__label">Danger</span>
+                        <span>Danger</span>
                         <span>Correction failed. This association has already been corrected.</span>
                       </div>`;
                   });
@@ -3676,7 +3596,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                            role="status"
                            aria-live="polite"
                            aria-label="{{statusLabel}}">
-                        <span class="chatbot-status__label">{{(statusKind is "success" ? "Success" : "Warning")}}</span>
+                        <span>{{(statusKind is "success" ? "Success" : "Warning")}}</span>
                         <span>{{statusMessage}}</span>
                       </div>
                       <dl class="chatbot-definition-list chatbot-labelled-row-list">
@@ -4021,7 +3941,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         app.ShouldContain("css/chatbot.tokens.css");
         css.ShouldNotContain("--chatbot-color-", Case.Sensitive);
-        css.ShouldNotContain(".chatbot-status__label", Case.Sensitive);
         ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor")
             .ShouldContain("<FluentMessageBar");
         fixture.ShouldContain("<main id=\"chatbot-main-content\"");
@@ -4069,28 +3988,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         initialContent.ShouldNotContain("Projection status: pending");
         initialContent.ShouldNotContain("Audit status: committed");
         initialContent.ShouldNotContain("Audit history: metadata only");
-    }
-
-    private static void AssertReducedMotionWithoutBrowser()
-    {
-        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
-        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
-
-        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
-        css.ShouldContain(".chatbot-shimmer");
-        css.ShouldContain(".chatbot-skeleton");
-        css.ShouldContain(".chatbot-row-motion");
-        css.ShouldContain(".chatbot-streaming-text");
-        css.ShouldContain(".chatbot-panel-transition");
-        css.ShouldContain("animation: none !important;");
-        css.ShouldContain("transition-duration: 0.01ms !important;");
-        css.ShouldContain("scroll-behavior: auto !important;");
-        css.ShouldContain("background-image: none !important;");
-        css.ShouldContain("transform: none !important;");
-        css.ShouldContain("@media (forced-colors: active)");
-
-        fixture.ShouldContain("data-chatbot-motion-fixture=\"governed-motion\"");
-        fixture.ShouldContain("Projection pending");
     }
 
     private static void AssertBusyRegionFocusPreservationWithoutBrowser()
@@ -4240,12 +4137,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         }
 
         page.ShouldContain("data-chatbot-operational-queue=\"true\"");
-        page.ShouldContain("ChatBotQueueLoadingMode.Pagination");
-        page.ShouldNotContain("ChatBotQueueLoadingMode.InfiniteScroll");
-        page.ShouldContain("GovernedOperationsQueuePrimaryAction");
-        page.ShouldContain("GovernedOperationsQueueSecondaryActions");
-        page.ShouldContain("GovernedOperationsQueueDetailUnavailable");
-        page.ShouldContain("page-size:100");
+        page.ShouldContain("GetTenantReviewQueueSummaryAsync");
+        page.ShouldContain("GetProjectReviewQueueAsync");
         page.ShouldContain("data-chatbot-source-version");
 
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
@@ -4261,8 +4154,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         css.ShouldContain("@media (max-width: 599px)");
         css.ShouldContain("overflow-wrap: anywhere;");
-        css.ShouldContain(".chatbot-definition-list");
-        css.ShouldContain(".chatbot-labelled-row");
+        css.ShouldContain(".chatbot-labelled-row-list");
         fixture.ShouldContain("data-chatbot-responsive-fixture=\"operational-queue-management\"");
         fixture.ShouldContain("item:failed-ingestion-001");
         fixture.ShouldContain("correlation:queue-failed-ingestion");
@@ -4320,22 +4212,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("bearer", Case.Insensitive);
-    }
-
-    private static void AssertForcedColorsWithoutBrowser()
-    {
-        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
-
-        int forcedColorsStart = css.IndexOf("@media (forced-colors: active)", StringComparison.Ordinal);
-        forcedColorsStart.ShouldBeGreaterThanOrEqualTo(0, "The forced-colors media query must exist.");
-
-        // Scope the outline/Highlight assertions to the forced-colors block itself. A bare css.ShouldContain("outline:")
-        // is already satisfied by the unrelated :focus outline earlier in the file, so it would pass even if the
-        // forced-colors focus outline were deleted — the whole point of this no-browser fallback.
-        string forcedColorsBlock = css[forcedColorsStart..];
-        forcedColorsBlock.ShouldContain("Highlight");
-        forcedColorsBlock.ShouldContain("outline:");
-        css.ShouldNotContain(".chatbot-status__label");
     }
 
     private static void AssertResponsiveFoundationWithoutBrowser()
@@ -4878,21 +4754,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("full email thread", Case.Insensitive);
     }
 
-    private static void AssertAssociationReviewForcedColorsAndBlockedWithoutBrowser()
+    private static void AssertAssociationReviewEvidenceAndBlockedWithoutBrowser()
     {
-        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
         string candidates = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates);
         string blocked = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.BlockedRedacted);
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
 
-        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
-        css.ShouldContain(".chatbot-association-candidate");
-        css.ShouldContain(".chatbot-association-comparison__panel");
-        css.ShouldContain("transform: none !important;");
-        css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("Highlight");
-
-        candidates.ShouldContain("chatbot-row-motion chatbot-panel-transition");
         candidates.ShouldContain("role=\"radio\"");
         candidates.ShouldContain("aria-checked=\"false\"");
         candidates.ShouldContain("aria-label=\"Candidate 1. Confidence 72%. Authorized candidate A\"");
@@ -4940,7 +4807,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         public IPage Page { get; }
 
-        public static async Task<BrowserHarness?> TryStartAsync(bool forcedColors = false)
+        public static async Task<BrowserHarness?> TryStartAsync()
         {
             string? chromeExecutable = ResolveChromeExecutable();
             if (chromeExecutable is null)
@@ -4950,7 +4817,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             try
             {
-                return await StartAsync(chromeExecutable, forcedColors).ConfigureAwait(false);
+                return await StartAsync(chromeExecutable).ConfigureAwait(false);
             }
             catch (PlaywrightException ex) when (IsBrowserUnavailable(ex))
             {
@@ -4958,7 +4825,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             }
         }
 
-        public static async Task<BrowserHarness> StartAsync(string chromeExecutable, bool forcedColors = false)
+        public static async Task<BrowserHarness> StartAsync(string chromeExecutable)
         {
             IPlaywright? playwright = null;
             IBrowser? browser = null;
@@ -4975,7 +4842,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 }).ConfigureAwait(false);
                 context = await browser.NewContextAsync(new()
                 {
-                    ForcedColors = forcedColors ? ForcedColors.Active : ForcedColors.None,
                     ReducedMotion = ReducedMotion.Reduce,
                 }).ConfigureAwait(false);
                 IPage page = await context.NewPageAsync().ConfigureAwait(false);

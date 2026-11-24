@@ -314,6 +314,82 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         }
     }
 
+    /// <summary>Checks keyboard selection and readable decision feedback on the real association route.</summary>
+    [Fact]
+    public async Task AssociationReviewShouldKeepKeyboardSelectionAndStatusCuesWithAccessiblePreferences()
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+        Surface association = Surfaces.Single(static surface => surface.Key == "association-review");
+        await OpenAsync(page, association, EnCulture, ColorModes[2], 1280, 900);
+        await AssertAccessiblePreferencesAsync(page);
+
+        ILocator status = page.Locator("fluent-message-bar[data-chatbot-stable-id='association-review-status']");
+        await Assertions.Expect(status.GetByText("Needs review. Outcome Candidates proposed.")).ToBeVisibleAsync();
+
+        ILocator candidates = page.GetByRole(AriaRole.Radiogroup, new() { NameString = "Candidate projects" });
+        ILocator candidate = candidates.GetByRole(AriaRole.Radio, new() { NameRegex = new Regex("Authorized candidate$") });
+        await Assertions.Expect(candidate).ToBeVisibleAsync();
+        await Assertions.Expect(candidate).ToHaveAttributeAsync("tabindex", "0");
+        await AssertMotionSuppressedAsync(candidate);
+
+        await candidate.FocusAsync();
+        await Assertions.Expect(candidate).ToBeFocusedAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(candidate).ToHaveAttributeAsync("aria-checked", "true");
+
+        await page.Locator("[data-chatbot-stable-id$=association-action-choose-candidate] fluent-button").PressAsync("Enter");
+        ILocator confirmation = page.GetByRole(AriaRole.Alert, new() { NameString = "Confirm this decision" });
+        await Assertions.Expect(confirmation.GetByText("You are about to record: Choose candidate.")).ToBeVisibleAsync();
+        await Assertions.Expect(confirmation).ToHaveAttributeAsync("aria-live", "assertive");
+    }
+
+    /// <summary>Checks that the governed operation exposes its projection state through visible text.</summary>
+    [Fact]
+    public async Task GovernedOperationsShouldKeepProjectionStatusReadableWithAccessiblePreferences()
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+        Surface governed = Surfaces.Single(static surface => surface.Key == "governed-operations");
+        await OpenAsync(page, governed, EnCulture, ColorModes[2], 1280, 900);
+        await AssertAccessiblePreferencesAsync(page);
+
+        ILocator action = page.Locator("[data-chatbot-stable-id='record-governed-note']");
+        ILocator record = action.Locator("fluent-button");
+        await AssertMotionSuppressedAsync(action);
+        await record.FocusAsync();
+        await Assertions.Expect(record).ToBeFocusedAsync();
+        await record.ClickAsync();
+
+        ILocator status = page.GetByRole(AriaRole.Status, new() { NameString = "Projection status: pending" });
+        await Assertions.Expect(status.GetByText("Projection is not complete.")).ToBeVisibleAsync();
+        await Assertions.Expect(status).ToHaveAttributeAsync("aria-live", "polite");
+    }
+
+    private static async Task AssertAccessiblePreferencesAsync(IPage page)
+    {
+        (await page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+        (await page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+    }
+
+    private static async Task AssertMotionSuppressedAsync(ILocator element)
+    {
+        await Assertions.Expect(element).ToHaveCSSAsync("animation-name", "none");
+        await Assertions.Expect(element).ToHaveCSSAsync("transition-delay", "0s");
+        bool transitionsSuppressed = await element.EvaluateAsync<bool>(
+            """
+            node => getComputedStyle(node).transitionDuration.split(',').every(value => {
+                const duration = Number.parseFloat(value);
+                return value.trim().endsWith('ms') ? duration <= 0.01 : duration <= 0.00001;
+            })
+            """);
+        transitionsSuppressed.ShouldBeTrue();
+    }
+
     // ──────────────────────────────────────────────────────────────────────────────────────────────────────
     // AC2 (Story 13.1): the FluentMessageBar status/blocked migration exposes exactly ONE authoritative live
     // region per banner. Fluent UI Blazor v5 renders FluentMessageBar as a <fluent-message-bar> custom element

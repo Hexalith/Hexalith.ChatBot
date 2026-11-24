@@ -7,6 +7,8 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 
 public sealed class Epic10ReleaseReadinessE2ETests
 {
+    private const string RealRenderCrossSurfacePath = "tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs";
+
     private static readonly Epic10GateRow[] GateRows =
     [
         new(
@@ -56,7 +58,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
                 ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs"] =
                 [
                     "AssociationReviewShouldSelectCandidateCompareEvidenceAndKeepDisabledReasonsReachable",
-                    "AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates",
+                    "AssociationReviewShouldPreserveEvidenceLabelsAndBlockedRedactionStates",
                     "Approval",
                     "aria-describedby",
                     "not-authorized",
@@ -79,7 +81,11 @@ public sealed class Epic10ReleaseReadinessE2ETests
                     "role=\"table\"",
                     "role=\"row\"",
                     "tabindex=\"0\"",
-                    "ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues",
+                ],
+                [RealRenderCrossSurfacePath] =
+                [
+                    "AssociationReviewShouldKeepKeyboardSelectionAndStatusCuesWithAccessiblePreferences",
+                    "GovernedOperationsShouldKeepProjectionStatusReadableWithAccessiblePreferences",
                 ],
                 ["tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsAccessibilityE2ETests.cs"] =
                 [
@@ -142,7 +148,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
             foreach ((string path, IReadOnlyList<string> requiredMarkers) in row.RequiredMarkersByPath)
             {
                 string source = ReadProjectFile(path);
-                source.ShouldContain("TryStartAsync");
+                source.ShouldContain(path == RealRenderCrossSurfacePath ? "NewContextAsync" : "TryStartAsync");
                 foreach (string marker in requiredMarkers)
                 {
                     source.ShouldContain(
@@ -156,7 +162,11 @@ public sealed class Epic10ReleaseReadinessE2ETests
     [Fact]
     public void BrowserUnavailableFallbacksShouldAssertSourceContractsInsteadOfReturningVacuously()
     {
-        foreach (string path in GateRows.SelectMany(static row => row.RequiredMarkersByPath.Keys).Distinct(StringComparer.Ordinal))
+        IEnumerable<string> fallbackSources = GateRows
+            .SelectMany(static row => row.RequiredMarkersByPath.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .Where(static path => path != RealRenderCrossSurfacePath);
+        foreach (string path in fallbackSources)
         {
             string source = ReadProjectFile(path);
             MatchCollection fallbacks = Regex.Matches(
