@@ -2120,6 +2120,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
   summary: The after-unit-tests runtime hook only resolves Playwright's linux-x64 node and requires GITHUB_ENV.
   evidence: `.github/actions/after-unit-tests/require-runtime.py` hard-codes `tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/.playwright/node/linux-x64/node` and opens `os.environ["GITHUB_ENV"]`. A non-linux-x64 runner or a local invocation without that variable fails before fail-closed live tests can be enabled.
+  resolution: Resolved 2026-11-24. The runtime hook resolves the packaged Node executable for the host and emits shell-quoted local settings when GITHUB_ENV is unset. Tests cover the supported paths and both output modes. This also resolves the duplicate nightly-runtime-hook entry.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
   summary: Recovery mailbox token identity parsing has no bounded JWT error path.
