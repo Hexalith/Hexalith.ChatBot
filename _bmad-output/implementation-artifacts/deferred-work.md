@@ -2187,6 +2187,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: `with-source-mapping.py` raises if `hexalith-module --version` fails after restore.
   evidence: `.github/scripts/with-source-mapping.py:31-32` uses `check=True` instead of returning the tool exit code. Composition wrapper, not this story.
+  resolution: Resolved 2026-11-24. The wrapper forwards the version command's stdout, stderr, and exit status before building. A controlled tool shim restored successfully, exited 37 from the version command, and confirmed that preparation and the build were never invoked.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: An empty association-id load dispatches failure without the generation guard used for other load failures.

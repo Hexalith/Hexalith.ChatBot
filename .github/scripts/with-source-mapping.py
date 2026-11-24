@@ -28,10 +28,17 @@ def main() -> int:
     restore = subprocess.run(["dotnet", "tool", "restore", "--tool-manifest", str(manifest)], cwd=root)
     if restore.returncode:
         return restore.returncode
-    version = subprocess.run(["dotnet", "tool", "run", "hexalith-module", "--", "--version"],
-                             cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+    version = subprocess.run(
+        ["dotnet", "tool", "run", "hexalith-module", "--", "--version"],
+        cwd=root, capture_output=True,
+    )
+    if version.returncode:
+        sys.stdout.buffer.write(version.stdout)
+        sys.stderr.buffer.write(version.stderr)
+        return 128 - version.returncode if version.returncode < 0 else version.returncode
+
     pin = json.loads(manifest.read_text())["tools"]["hexalith.builds.module.cli"]["version"]
-    if version.split("+", 1)[0] != pin:
+    if version.stdout.decode().strip().split("+", 1)[0] != pin:
         raise ValueError("The restored module tool differs from the exact local pin")
 
     # Retain imports for descendant builds, including detached Aspire resources.
