@@ -1219,7 +1219,9 @@ public sealed partial class AiExecutionCoordinatorTests
                 CallbackObserved.TrySetResult();
             });
             Started.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            // A separate cancellable wait can unwind and dispose this registration before its callback runs.
+            await CallbackObserved.Task.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             throw new InvalidOperationException("The cancellation-only provider cannot complete naturally.");
         }
     }
