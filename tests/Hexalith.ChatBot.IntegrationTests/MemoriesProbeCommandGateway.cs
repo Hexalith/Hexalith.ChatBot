@@ -354,32 +354,42 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
 
     private async Task<IResult> ForwardCommandAsync(HttpRequest request, bool bound, CancellationToken cancellationToken)
     {
-        using JsonDocument body = await JsonDocument.ParseAsync(request.Body, cancellationToken: cancellationToken).ConfigureAwait(false);
-        JsonElement command = bound ? body.RootElement.GetProperty("command") : body.RootElement;
-        if (bound && (string.IsNullOrWhiteSpace(body.RootElement.GetProperty("principalId").GetString())
+        JsonDocument parsed;
+        try
+        {
+            parsed = await JsonDocument.ParseAsync(request.Body, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            return RefuseCommand();
+        }
+
+        using JsonDocument body = parsed;
+        JsonElement command = body.RootElement;
+        if (bound && (string.IsNullOrWhiteSpace(ReadStringProperty(body.RootElement, "principalId"))
+            || !body.RootElement.TryGetProperty("command", out command)
             || !request.Headers.TryGetValue(BoundWorkloadCommandProof.HeaderName, out var proof) || proof.Count != 1
             || !request.Headers.TryGetValue("X-Hexalith-Workload-Assertion", out var assertion) || assertion.Count != 1))
         {
-            Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+            return RefuseCommand();
         }
-        string? tenant = command.GetProperty("tenant").GetString();
-        string? domain = command.GetProperty("domain").GetString();
-        string? type = command.GetProperty("commandType").GetString();
+
+        string? tenant = ReadStringProperty(command, "tenant");
+        string? domain = ReadStringProperty(command, "domain");
+        string? type = ReadStringProperty(command, "commandType");
         Volatile.Write(ref _lastRequestDomain, domain);
         Volatile.Write(ref _lastRequestType, type);
         if (tenant is null || !ProvisionedTenants.Contains(tenant, StringComparer.Ordinal) || domain != "memories-tenants"
             || type is not ("register-tenant" or "update-tenant-lifecycle-status"))
         {
-            Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+            return RefuseCommand();
         }
 
-        if (!command.GetProperty("payload").TryGetProperty("tenantId", out JsonElement payloadTenant)
-            || !string.Equals(payloadTenant.GetString(), tenant, StringComparison.Ordinal))
+        string? messageId = ReadStringProperty(command, "messageId");
+        if (string.IsNullOrWhiteSpace(messageId) || !command.TryGetProperty("payload", out JsonElement payload)
+            || !string.Equals(ReadStringProperty(payload, "tenantId"), tenant, StringComparison.Ordinal))
         {
-            Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+            return RefuseCommand();
         }
 
         HttpClient? eventStore = bound ? _workloadEventStore : _eventStore;
@@ -404,10 +414,34 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         if (response.StatusCode == HttpStatusCode.Accepted)
         {
             Interlocked.Increment(ref _acceptedCommands);
-            _acceptedTenants.TryAdd(command.GetProperty("messageId").GetString()!, tenant!);
+            _acceptedTenants.TryAdd(messageId, tenant);
         }
 
         return Results.Content(content, response.Content.Headers.ContentType?.ToString() ?? "application/json", statusCode: (int)response.StatusCode);
     }
 
+    private IResult RefuseCommand()
+    {
+        Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+
+    private static string? ReadStringProperty(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out JsonElement value)
+            || value.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        try
+        {
+            return value.GetString();
+        }
+        catch (InvalidOperationException)
+        {
+            // System.Text.Json can defer validation of a JSON string's encoding until it is read.
+            return null;
+        }
+    }
 }

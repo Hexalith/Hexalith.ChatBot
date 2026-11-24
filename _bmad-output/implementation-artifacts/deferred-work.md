@@ -2199,6 +2199,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: The bound Memories probe helper throws if JSON omits `command` instead of returning 403.
   evidence: `MemoriesProbeCommandGateway.cs:358` calls `GetProperty("command")` before bound-proof 403 handling. Test double, later Memories probe work.
+  resolution: Resolved 2026-11-24. Malformed or incomplete command envelopes return 403 before the fixture forwards a request. Loopback HTTP regressions cover missing fields and invalid JSON shapes.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: ChatBot silences Aspire 17 `AddProject` deprecations for every project.
