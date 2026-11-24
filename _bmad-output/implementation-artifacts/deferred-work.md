@@ -2284,3 +2284,4 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch.md`
   summary: Verify that the nightly release hook executes both required release checks.
   evidence: The minimum discovery count rejects an empty run, but one surviving test can satisfy it if discovery loses the M2 or origin-parity check. The two required identities are declared in `tests/Hexalith.ChatBot.Release.Tests/GovernedStateReleaseGateTests.cs`.
+  resolution: Resolved 2026-11-24. The nightly hook requires both named release checks to pass exactly once in a fresh TRX. Controlled runs covered success, missing, skipped, renamed and duplicate results, and runner failure.
