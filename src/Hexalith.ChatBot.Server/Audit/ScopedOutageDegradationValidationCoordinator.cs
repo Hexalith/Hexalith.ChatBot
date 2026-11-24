@@ -177,6 +177,7 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
         ArgumentException.ThrowIfNullOrWhiteSpace(testTenantRef);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
+        cancellationToken.ThrowIfCancellationRequested();
         DateTimeOffset now = clock.UtcNow;
 
         // Fail-closed: a validation must never target a production tenant and must exercise a known dependency. Either
@@ -186,6 +187,7 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
         {
             ScopedOutageDegradationReport unmeasurable = ScopedOutageDegradationReport.Unmeasurable(testTenantRef, dependency, correlationId, now, now);
             unmeasurable = await RetainAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             bool didAlertGuard = await AuditThenAlertAsync(unmeasurable, correlationId, cancellationToken).ConfigureAwait(false);
             return (unmeasurable, didAlertGuard);
         }
@@ -225,6 +227,7 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
         }
 
         report = await RetainAsync(report, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         bool didAlert = await AuditThenAlertAsync(report, correlationId, cancellationToken).ConfigureAwait(false);
         return (report, didAlert);
     }
@@ -241,10 +244,12 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
     {
         try
         {
-            await evidenceSink.RecordAsync(report, cancellationToken).ConfigureAwait(false);
+            await RecoveryValidationEvidenceRetentionFailureRecorder.WritePrimaryAsync(
+                    token => evidenceSink.RecordAsync(report, token), cancellationToken)
+                .ConfigureAwait(false);
             return report;
         }
-        catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+        catch (Exception)
         {
             DateTimeOffset endedAtUtc = clock.UtcNow;
             if (endedAtUtc < report.StartedAtUtc)
@@ -268,16 +273,9 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
                 Deviations = [.. unmeasurable.Deviations, ScopedOutageDegradationReport.EvidenceRetentionFailedDeviation],
                 ExecutionAssertions = report.ExecutionAssertions,
             };
-            try
+            if (!await RecoveryValidationEvidenceRetentionFailureRecorder.TryRetainFallbackAsync(
+                    token => evidenceSink.RecordAsync(unmeasurable, token)).ConfigureAwait(false))
             {
-                await evidenceSink.RecordAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception)
-            {
-                // Unfiltered: the primary RecordAsync already failed (not from cancellation, per the outer filter), so
-                // this fallback write must still degrade to the unmeasurable report even if the token is cancelled
-                // mid-fallback. The caller still receives an unmeasurable stop-ship report when the retaining sink is
-                // unavailable.
                 await TryRecordRetentionFailureAsync(unmeasurable).ConfigureAwait(false);
             }
 
@@ -321,6 +319,7 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
             return false;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         await operatorAlertSink
             .EmitAsync(
                 new OperatorAlert(

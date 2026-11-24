@@ -177,6 +177,7 @@ internal sealed class ProjectionRebuildValidationCoordinator(
         ArgumentException.ThrowIfNullOrWhiteSpace(datasetRef);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
+        cancellationToken.ThrowIfCancellationRequested();
         DateTimeOffset now = clock.UtcNow;
 
         // Fail-closed: a validation must never target a production tenant. The driver is never invoked; the report is an
@@ -191,6 +192,7 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 now,
                 GovernedOperationView.CurrentSchemaVersion);
             unmeasurable = await RetainAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             bool didAlertGuard = await AuditThenAlertAsync(unmeasurable, correlationId, cancellationToken).ConfigureAwait(false);
             return (unmeasurable, didAlertGuard);
         }
@@ -255,6 +257,7 @@ internal sealed class ProjectionRebuildValidationCoordinator(
         }
 
         report = await RetainAsync(report, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         bool didAlert = await AuditThenAlertAsync(report, correlationId, cancellationToken).ConfigureAwait(false);
         return (report, didAlert);
     }
@@ -271,10 +274,12 @@ internal sealed class ProjectionRebuildValidationCoordinator(
     {
         try
         {
-            await evidenceSink.RecordAsync(report, cancellationToken).ConfigureAwait(false);
+            await RecoveryValidationEvidenceRetentionFailureRecorder.WritePrimaryAsync(
+                    token => evidenceSink.RecordAsync(report, token), cancellationToken)
+                .ConfigureAwait(false);
             return report;
         }
-        catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+        catch (Exception)
         {
             DateTimeOffset endedAtUtc = clock.UtcNow;
             if (endedAtUtc < report.StartedAtUtc)
@@ -299,16 +304,9 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 Deviations = [.. unmeasurable.Deviations, ProjectionRebuildReport.EvidenceRetentionFailedDeviation],
                 ExecutionAssertions = report.ExecutionAssertions,
             };
-            try
+            if (!await RecoveryValidationEvidenceRetentionFailureRecorder.TryRetainFallbackAsync(
+                    token => evidenceSink.RecordAsync(unmeasurable, token)).ConfigureAwait(false))
             {
-                await evidenceSink.RecordAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception)
-            {
-                // Unfiltered: the primary RecordAsync already failed (not from cancellation, per the outer filter), so
-                // this fallback write must still degrade to the unmeasurable report even if the token is cancelled
-                // mid-fallback. The caller still receives an unmeasurable stop-ship report when the retaining sink is
-                // unavailable.
                 await TryRecordRetentionFailureAsync(unmeasurable).ConfigureAwait(false);
             }
 
@@ -352,6 +350,7 @@ internal sealed class ProjectionRebuildValidationCoordinator(
             return false;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         await operatorAlertSink
             .EmitAsync(
                 new OperatorAlert(

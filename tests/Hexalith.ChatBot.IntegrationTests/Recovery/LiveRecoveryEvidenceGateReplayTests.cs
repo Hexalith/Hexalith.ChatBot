@@ -70,6 +70,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             artifactRoot, serializerOptions, cancellationToken).ConfigureAwait(false);
 
         List<RecoveryValidationEvidenceManifest> manifests = [];
+        InvalidDataException? canonicalEvidenceFailure = null;
         string manifestRoot = Path.Combine(artifactRoot, "live-recovery");
         if (Directory.Exists(manifestRoot))
         {
@@ -78,24 +79,32 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
                 .ToHashSet(StringComparer.Ordinal);
             foreach (string path in Directory.EnumerateFiles(manifestRoot, $"*{ManifestSuffix}", SearchOption.AllDirectories))
             {
-                RecoveryValidationEvidenceManifest manifest = await ReadRetainedJsonAsync<RecoveryValidationEvidenceManifest>(
-                    path, "manifest", serializerOptions, cancellationToken).ConfigureAwait(false);
                 string reportPath = $"{path[..^ManifestSuffix.Length]}.report.json";
-                using JsonDocument report = await ReadRetainedJsonAsync<JsonDocument>(
-                    reportPath, "report", serializerOptions, cancellationToken,
-                    manifest.ReportSha256 ?? string.Empty).ConfigureAwait(false);
-                if (!MatchesReport(manifest, report.RootElement))
+                try
                 {
-                    throw new InvalidDataException("A retained recovery report does not match its manifest.");
-                }
+                    RecoveryValidationEvidenceManifest manifest = await ReadRetainedJsonAsync<RecoveryValidationEvidenceManifest>(
+                        path, "manifest", serializerOptions, cancellationToken).ConfigureAwait(false);
+                    using JsonDocument report = await ReadRetainedJsonAsync<JsonDocument>(
+                        reportPath, "report", serializerOptions, cancellationToken,
+                        manifest.ReportSha256 ?? string.Empty).ConfigureAwait(false);
+                    if (!MatchesReport(manifest, report.RootElement))
+                    {
+                        throw new InvalidDataException("A retained recovery report does not match its manifest.");
+                    }
 
-                _ = reportPaths.Remove(reportPath);
-                manifests.Add(manifest);
+                    _ = reportPaths.Remove(reportPath);
+                    manifests.Add(manifest);
+                }
+                catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+                {
+                    canonicalEvidenceFailure ??= exception as InvalidDataException ??
+                        new InvalidDataException("A retained recovery manifest or report could not be read.");
+                }
             }
 
             if (reportPaths.Count != 0)
             {
-                throw new InvalidDataException("A retained recovery report is missing its manifest.");
+                canonicalEvidenceFailure ??= new InvalidDataException("A retained recovery report is missing its manifest.");
             }
         }
 
@@ -108,7 +117,23 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             manifests,
             markers,
             summary.AlertsDeliveredByJob);
-        return LiveRecoveryValidationEvidenceGate.Evaluate(attempt, policy, DateTimeOffset.UtcNow);
+        LiveRecoveryValidationEvidenceGateDecision decision =
+            LiveRecoveryValidationEvidenceGate.Evaluate(attempt, policy, DateTimeOffset.UtcNow);
+        if (canonicalEvidenceFailure is null)
+        {
+            return decision;
+        }
+
+        if (!decision.StopShipReasons.Any(reason => reason.EndsWith(":evidence_retention_failed", StringComparison.Ordinal)))
+        {
+            throw canonicalEvidenceFailure;
+        }
+
+        return decision with
+        {
+            IsStopShip = true,
+            StopShipReasons = [.. decision.StopShipReasons, "canonical_evidence_invalid"],
+        };
     }
 
     private static bool MatchesReport(RecoveryValidationEvidenceManifest manifest, JsonElement report)
@@ -310,8 +335,10 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
                 cancelled.Token).ConfigureAwait(true));
     }
 
-    [Fact]
-    public async Task WorkflowShapedArtifactReplaysAllFourRetentionFailuresWithoutManifests()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkflowShapedArtifactReplaysAllFourRetentionFailures(bool hasPartialCanonicalEvidence)
     {
         string root = Path.Combine(Path.GetTempPath(), $"recovery-workflow-artifact-{Guid.NewGuid():N}");
         string canonicalEvidenceRoot = Path.Combine(root, "canonical-evidence");
@@ -358,7 +385,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             RunId = runId,
             StartedAtUtc = startedAtUtc,
             CompletedAtUtc = completedAtUtc,
-            LatestAttemptCompletedSuccessfully = true,
+            LatestAttemptCompletedSuccessfully = !hasPartialCanonicalEvidence,
             AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 [LiveRecoveryValidationJobs.Continuity] = 0,
@@ -379,6 +406,13 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             File.Copy(source, Path.Combine(uploadedSideChannelRoot, Path.GetFileName(source)));
         }
 
+        if (hasPartialCanonicalEvidence)
+        {
+            string manifestDirectory = Directory.CreateDirectory(Path.Combine(artifactRoot, "live-recovery")).FullName;
+            await File.WriteAllTextAsync(Path.Combine(manifestDirectory, "interrupted.manifest.json"), "{",
+                TestContext.Current.CancellationToken).ConfigureAwait(true);
+        }
+
         LiveRecoveryValidationEvidenceGateDecision decision = await ReplayRetainedArtifactAsync(
             artifactRoot, ReplayPolicy(),
             TestContext.Current.CancellationToken).ConfigureAwait(true);
@@ -397,7 +431,8 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             }
         }
 
-        Directory.GetFiles(artifactRoot, "*.manifest.json", SearchOption.AllDirectories).ShouldBeEmpty();
+        decision.StopShipReasons.Contains("canonical_evidence_invalid").ShouldBe(hasPartialCanonicalEvidence);
+        Directory.Delete(root, recursive: true);
     }
 
     [Fact]

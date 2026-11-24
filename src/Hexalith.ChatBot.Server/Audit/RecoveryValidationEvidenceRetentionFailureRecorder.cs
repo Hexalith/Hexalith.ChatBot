@@ -3,6 +3,29 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// <summary>Records the diagnostic retention-failure side channel without delaying audit and alert indefinitely.</summary>
 internal static class RecoveryValidationEvidenceRetentionFailureRecorder
 {
+    private static readonly TimeSpan FallbackTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>Writes the measured report while the scenario still has a live caller.</summary>
+    internal static Task WritePrimaryAsync(Func<CancellationToken, ValueTask> recordAsync, CancellationToken cancellationToken)
+        => Task.Run(() => recordAsync(cancellationToken).AsTask(), cancellationToken).WaitAsync(cancellationToken);
+
+    /// <summary>Tries one canonical unmeasurable write with a separate budget after the primary write fails.</summary>
+    internal static async ValueTask<bool> TryRetainFallbackAsync(Func<CancellationToken, ValueTask> recordAsync)
+    {
+        using CancellationTokenSource deadline = new(FallbackTimeout);
+        CancellationToken token = deadline.Token;
+        try
+        {
+            // Apply the deadline even if the sink blocks before returning its asynchronous operation.
+            await Task.Run(() => recordAsync(token).AsTask(), token).WaitAsync(token).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     /// <summary>The single product-wide upper bound for a best-effort marker write.</summary>
     internal static readonly TimeSpan SinkTimeout = TimeSpan.FromSeconds(1);
 

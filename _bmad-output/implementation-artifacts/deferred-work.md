@@ -1225,7 +1225,8 @@ location: src/Hexalith.ChatBot.Server/Audit/ContinuityDrillCoordinator.cs:231
 source_spec: `spec-retention-failure-marker.md`
 severity: medium
 reason: All three coordinators guard the retention fallback with `catch (Exception) when (cancellationToken is { IsCancellationRequested: false })`. The filter predates this story and is deliberately documented, and the marker is specified to be emitted only after both `RecordAsync` attempts fail -- so the current behaviour is spec-conformant. It nonetheless leaves the workflow-timeout path (the 265m SIGINT ladder in ci.yml / release.yml, i.e. the failure most likely to lose evidence) with no artifact-level reason at all: the gate reports plain `<job>:missing_evidence`, which is the exact reconstruction gap this story closed for the non-cancelled path.
-status: open
+status: done 2026-11-24
+resolution: All three coordinators reserve a bounded independent write after primary retention fails. Failed fallback records the existing marker. Replay still surfaces valid markers when a canonical pair is incomplete. Tests cover both fallback outcomes, cancellation, a hanging fallback and partial artifacts.
 decision: 2026-08-28 Mark cancellation loss — Define a bounded cancellation-safe retention path, attempt the required canonical fallback semantics, emit an independent marker when evidence cannot be retained, and update all coordinators, gates, workflows, and tests consistently.
 decision: 2026-08-28 Mark cancellation loss — Define a bounded cancellation-safe retention path, attempt the required canonical fallback semantics, emit an independent marker when evidence cannot be retained, and update all coordinators, gates, workflows, and tests consistently.
 

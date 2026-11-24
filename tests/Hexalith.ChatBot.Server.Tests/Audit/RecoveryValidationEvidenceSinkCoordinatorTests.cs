@@ -152,6 +152,107 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         AssertRetentionRanBeforeAuditThenAlert(callOrder);
     }
 
+    [Theory]
+    [InlineData(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage, true)]
+    [InlineData(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage, false)]
+    [InlineData(LiveRecoveryValidationJobs.ProjectionRebuild, RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario, true)]
+    [InlineData(LiveRecoveryValidationJobs.ProjectionRebuild, RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario, false)]
+    [InlineData(LiveRecoveryValidationJobs.ScopedOutage, ScopedOutageDependencies.CommandExecution, true)]
+    [InlineData(LiveRecoveryValidationJobs.ScopedOutage, ScopedOutageDependencies.CommandExecution, false)]
+    public async Task CancellationDuringPrimaryWriteStillRetainsFallbackOrMarker(
+        string job, string scenario, bool fallbackSucceeds)
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        CancellationDuringWriteSink evidence = new(caller, fallbackSucceeds);
+        CapturingMarkerSink markers = new();
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        WormAuditTestData.FixedClock clock = new(Now);
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+        {
+            switch (job)
+            {
+                case LiveRecoveryValidationJobs.Continuity:
+                    _ = await new ContinuityDrillCoordinator(new ContinuityRunner(), audit, alerts, clock, evidence, markers)
+                        .RunScenarioAndRecordAsync(scenario, TestTenant, Correlation, caller.Token).ConfigureAwait(true);
+                    break;
+                case LiveRecoveryValidationJobs.ProjectionRebuild:
+                    _ = await new ProjectionRebuildValidationCoordinator(new RebuildDriver(), audit, alerts, clock, evidence, markers)
+                        .RunValidationAndRecordAsync(TestTenant, "recovery-baseline-v1", Correlation, caller.Token).ConfigureAwait(true);
+                    break;
+                default:
+                    _ = await new ScopedOutageDegradationValidationCoordinator(new OutageDriver(), audit, alerts, clock, evidence, markers)
+                        .RunScenarioAndRecordAsync(scenario, TestTenant, Correlation, caller.Token).ConfigureAwait(true);
+                    break;
+            }
+        });
+
+        evidence.Writes.Count.ShouldBe(2);
+        evidence.Writes[1].Verdict.ShouldBe("unmeasurable");
+        evidence.Writes[1].Token.ShouldNotBe(caller.Token);
+        evidence.Writes[1].Token.CanBeCanceled.ShouldBeTrue();
+        if (fallbackSucceeds)
+        {
+            markers.Markers.ShouldBeEmpty();
+        }
+        else
+        {
+            RecoveryValidationEvidenceRetentionFailureMarker marker = markers.Markers.ShouldHaveSingleItem();
+            marker.JobId.ShouldBe(job);
+            marker.Scenario.ShouldBe(scenario);
+        }
+
+        audit.Envelopes.ShouldBeEmpty();
+        alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallerCancellationDoesNotWaitForAnUnresponsivePrimarySink()
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task write = RecoveryValidationEvidenceRetentionFailureRecorder.WritePrimaryAsync(
+            _ =>
+            {
+                entered.TrySetResult();
+                return new ValueTask(completion.Task);
+            }, caller.Token);
+        try
+        {
+            await entered.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+            await caller.CancelAsync().ConfigureAwait(true);
+            await Should.ThrowAsync<OperationCanceledException>(() =>
+                write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).ConfigureAwait(true);
+            completion.Task.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            completion.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task FallbackDeadlineDoesNotWaitForAnUnresponsiveSink()
+    {
+        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            bool retained = await RecoveryValidationEvidenceRetentionFailureRecorder
+                .TryRetainFallbackAsync(_ => new ValueTask(completion.Task))
+                .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken).ConfigureAwait(true);
+            retained.ShouldBeFalse();
+            completion.Task.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            completion.TrySetResult();
+        }
+    }
+
     [Fact]
     public async Task SuccessfulFallbackEvidenceWriteDoesNotEmitMarker()
     {
@@ -361,6 +462,36 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
 
         public ValueTask RecordAsync(ScopedOutageDegradationReport report, CancellationToken cancellationToken)
             => throw new IOException("evidence unavailable");
+    }
+
+    private sealed class CancellationDuringWriteSink(CancellationTokenSource caller, bool fallbackSucceeds)
+        : IRecoveryValidationEvidenceSink
+    {
+        public List<(string Verdict, CancellationToken Token)> Writes { get; } = [];
+
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
+            => RecordAsync(report.Verdict, cancellationToken);
+
+        public ValueTask RecordAsync(ProjectionRebuildReport report, CancellationToken cancellationToken)
+            => RecordAsync(report.Verdict, cancellationToken);
+
+        public ValueTask RecordAsync(ScopedOutageDegradationReport report, CancellationToken cancellationToken)
+            => RecordAsync(report.Verdict, cancellationToken);
+
+        private ValueTask RecordAsync(string verdict, CancellationToken cancellationToken)
+        {
+            Writes.Add((verdict, cancellationToken));
+            if (Writes.Count == 1)
+            {
+                caller.Cancel();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return fallbackSucceeds ? ValueTask.CompletedTask : ValueTask.FromException(new IOException("Cannot retain fallback."));
+        }
     }
 
     private sealed class FallbackSucceedsSink : IRecoveryValidationEvidenceSink

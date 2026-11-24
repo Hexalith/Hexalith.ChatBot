@@ -98,6 +98,11 @@ The production `IReadModelStore` abstraction does not enumerate partition keys. 
 
 The canonical reports remain the verdict authority. A metadata-only manifest adds run/scenario ULIDs, UTC bounds, repository/topology/configuration versions, safe tenant and dataset locators, configured corpus volume, per-scenario exercised dataset volume, driver mode, fault/restore/cleanup actions, expected/observed scope, measurements and targets, verdict dimensions, assertions, coverage, deviations, durable residual identifiers, and raw-artifact locators.
 
+After a primary report write fails, the coordinator gives the unmeasurable fallback two seconds with
+its own cancellation token. This reserve applies even if the workflow deadline fired during retention.
+Once retention or marker recording finishes, caller cancellation stops audit and alert delivery.
+The reserve requires the process to remain alive through the write.
+
 When both the canonical report write and its unmeasurable fallback write fail, the coordinator makes exactly one
 best-effort write through an independent retention-failure sink before auditing and alerting. Its sentinel is diagnostic
 proof of evidence-sink loss, never recovery evidence. The closed `chatbot.recovery-retention-failure.v1` schema carries
