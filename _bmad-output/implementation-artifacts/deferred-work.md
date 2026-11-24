@@ -182,7 +182,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: existing gate producer-trust residual
 severity: medium
 reason: **[MEDIUM · gate producer] In-process gate evaluation remains smoke while gate trusts producer summary fields.** Reconfirmed. **Release-claim impact:** buggy producer can still influence completion grading. **Owner:** existing gate producer-trust residual. **Closure evidence:** per existing entry.
-status: open
+status: done 2026-11-24
+resolution: Nightly exports a fresh recovery bundle and runs a separate, required retained-evidence replay with checkout-pinned policy. The regression suite covers absent, malformed, and mismatched reports and manifests.
 
 ### DW-21: [MEDIUM · evidence sink] Double-fail `RetainAsync` returns unmeasurable with no disk artifact.
 

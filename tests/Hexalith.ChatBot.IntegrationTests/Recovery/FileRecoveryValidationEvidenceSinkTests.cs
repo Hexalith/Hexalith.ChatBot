@@ -21,18 +21,7 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
         string runId = ChatBotCorrelationId.New().Value;
         try
         {
-            foreach (string scenario in ContinuityDrillScenarios.All)
-            {
-                await sink.RecordAsync(MetReport(runId, scenario, started), TestContext.Current.CancellationToken).ConfigureAwait(true);
-            }
-
-            await sink.RecordAsync(ControlledLossReport(runId, started), TestContext.Current.CancellationToken).ConfigureAwait(true);
-            await sink.RecordAsync(EquivalentProjectionReport(runId, started, 2), TestContext.Current.CancellationToken).ConfigureAwait(true);
-            foreach (string dependency in ScopedOutageDependencies.All)
-            {
-                await sink.RecordAsync(ContainedScopedOutageReport(runId, started) with { Dependency = dependency },
-                    TestContext.Current.CancellationToken).ConfigureAwait(true);
-            }
+            await WriteAllPassingReportsAsync(sink, runId, started, TestContext.Current.CancellationToken).ConfigureAwait(true);
 
             RecoveryValidationEvidenceManifest[] manifests = Directory.GetFiles(directory, "*.manifest.json")
                 .Select(DeserializeManifest).ToArray();
@@ -58,6 +47,171 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
         finally
         {
             Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>Replays the sink's exported bytes with release policy and checks missing, corrupt, and mismatched inputs.</summary>
+    [Theory]
+    [InlineData("valid")]
+    [InlineData("missing-summary")]
+    [InlineData("missing-manifest")]
+    [InlineData("missing-report")]
+    [InlineData("missing-pair")]
+    [InlineData("malformed-summary")]
+    [InlineData("malformed-manifest")]
+    [InlineData("malformed-report")]
+    [InlineData("different-commit")]
+    [InlineData("different-run")]
+    [InlineData("different-report")]
+    [InlineData("report-contradiction")]
+    public async Task RetainedArtifactReplaysTheExportedEvidence(string scenario)
+    {
+        string artifactRoot = Directory.CreateTempSubdirectory("chatbot-retained-recovery-").FullName;
+        try
+        {
+            await VerifyRetainedArtifactAsync(artifactRoot, scenario).ConfigureAwait(true);
+        }
+        finally
+        {
+            Directory.Delete(artifactRoot, recursive: true);
+        }
+    }
+
+    private static async Task VerifyRetainedArtifactAsync(string artifactRoot, string scenario)
+    {
+        const string Commit = "0123456789abcdef0123456789abcdef01234567";
+        DateTimeOffset started = DateTimeOffset.UtcNow.AddMinutes(-2);
+        string runId = ChatBotCorrelationId.New().Value;
+        string manifestRoot = Path.Combine(artifactRoot, "live-recovery", runId);
+        string summaryRoot = Path.Combine(artifactRoot, "retention-failures");
+        string summaryPath = Path.Combine(summaryRoot, LiveRecoveryValidationAttemptSummary.FileName);
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        FileRecoveryValidationEvidenceSink sink = new(Options(manifestRoot), Commit, "1.18.4", "13.4.6", "1.0.0");
+        await WriteAllPassingReportsAsync(sink, runId, started, cancellationToken).ConfigureAwait(true);
+        Directory.CreateDirectory(summaryRoot);
+        LiveRecoveryValidationAttemptSummary summary = new()
+        {
+            Enabled = true,
+            RunId = scenario == "different-run" ? ChatBotCorrelationId.New().Value : runId,
+            StartedAtUtc = started,
+            CompletedAtUtc = started.AddMinutes(1),
+            LatestAttemptCompletedSuccessfully = true,
+            AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal),
+        };
+        await File.WriteAllTextAsync(summaryPath, JsonSerializer.Serialize(summary, JsonSerializerOptions.Web), cancellationToken)
+            .ConfigureAwait(true);
+
+        string manifestPath = Path.Combine(manifestRoot, $"{ContinuityDrillScenarios.EventStoreOutage}.manifest.json");
+        string reportPath = Path.Combine(manifestRoot, $"{ContinuityDrillScenarios.EventStoreOutage}.report.json");
+        string? expectedError = null;
+        switch (scenario)
+        {
+            case "missing-summary":
+                File.Delete(summaryPath);
+                expectedError = "attempt summary is missing";
+                break;
+            case "missing-manifest":
+                File.Delete(manifestPath);
+                expectedError = "report is missing its manifest";
+                break;
+            case "missing-report":
+                File.Delete(reportPath);
+                expectedError = "report is missing";
+                break;
+            case "missing-pair":
+                File.Delete(manifestPath);
+                File.Delete(reportPath);
+                break;
+            case "malformed-summary":
+                await File.WriteAllTextAsync(summaryPath, "{", cancellationToken).ConfigureAwait(true);
+                expectedError = "attempt summary is malformed";
+                break;
+            case "malformed-manifest":
+                await File.WriteAllTextAsync(manifestPath, "{", cancellationToken).ConfigureAwait(true);
+                expectedError = "manifest is malformed";
+                break;
+            case "malformed-report":
+                await File.WriteAllTextAsync(reportPath, "{", cancellationToken).ConfigureAwait(true);
+                expectedError = "report is malformed";
+                break;
+            case "report-contradiction":
+                System.Text.Json.Nodes.JsonNode contradictory = System.Text.Json.Nodes.JsonNode.Parse(
+                    await File.ReadAllTextAsync(reportPath, cancellationToken).ConfigureAwait(true))!;
+                contradictory["executionAssertions"]!["cleanupComplete"] = false;
+                byte[] contradictoryBytes = JsonSerializer.SerializeToUtf8Bytes(contradictory);
+                await File.WriteAllBytesAsync(reportPath, contradictoryBytes, cancellationToken).ConfigureAwait(true);
+                System.Text.Json.Nodes.JsonNode pairedManifest = System.Text.Json.Nodes.JsonNode.Parse(
+                    await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(true))!;
+                pairedManifest["reportSha256"] = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(contradictoryBytes));
+                await File.WriteAllTextAsync(manifestPath, pairedManifest.ToJsonString(), cancellationToken).ConfigureAwait(true);
+                expectedError = "report does not match its manifest";
+                break;
+            case "different-report":
+                string report = await File.ReadAllTextAsync(reportPath, cancellationToken).ConfigureAwait(true);
+                await File.WriteAllTextAsync(
+                    reportPath, report.Replace(runId, ChatBotCorrelationId.New().Value, StringComparison.Ordinal), cancellationToken)
+                    .ConfigureAwait(true);
+                expectedError = "report does not match its manifest";
+                break;
+        }
+
+        LiveRecoveryValidationGatePolicy policy = LiveRecoveryValidationGatePolicy.ForRelease(
+            ["recovery-baseline"], true, RecoveryValidationEvidenceManifest.LiveDriverMode, TimeSpan.FromDays(8),
+            "v1", 6, 180, scenario == "different-commit" ? new string('b', 40) : Commit);
+        Task<LiveRecoveryValidationEvidenceGateDecision> ReplayAsync() => LiveRecoveryEvidenceGateReplayTests
+            .ReplayRetainedArtifactAsync(artifactRoot, policy, cancellationToken);
+        if (expectedError is not null)
+        {
+            InvalidDataException failure = await Should.ThrowAsync<InvalidDataException>(ReplayAsync).ConfigureAwait(true);
+            failure.Message.ShouldContain(expectedError);
+            return;
+        }
+
+        LiveRecoveryValidationEvidenceGateDecision decision = await ReplayAsync().ConfigureAwait(true);
+        string? expectedReason = scenario switch
+        {
+            "different-commit" => $"{LiveRecoveryValidationJobs.Continuity}:repository_commit_unexpected",
+            "different-run" => $"{LiveRecoveryValidationJobs.Continuity}:run_mismatch",
+            "missing-pair" => $"{LiveRecoveryValidationJobs.Continuity}:incomplete_scenario_set",
+            _ => null,
+        };
+        if (expectedReason is null)
+        {
+            decision.IsStopShip.ShouldBeFalse(string.Join(", ", decision.StopShipReasons));
+        }
+        else
+        {
+            decision.IsStopShip.ShouldBeTrue();
+            decision.StopShipReasons.ShouldContain(expectedReason);
+        }
+    }
+
+    private static async Task WriteAllPassingReportsAsync(
+        FileRecoveryValidationEvidenceSink sink, string runId, DateTimeOffset started, CancellationToken cancellationToken)
+    {
+        foreach (string scenario in ContinuityDrillScenarios.All)
+        {
+            await sink.RecordAsync(MetReport(runId, scenario, started), cancellationToken).ConfigureAwait(false);
+        }
+
+        await sink.RecordAsync(ControlledLossReport(runId, started), cancellationToken).ConfigureAwait(false);
+        await sink.RecordAsync(EquivalentProjectionReport(runId, started, 2) with
+        {
+            ExecutionAssertions = new RecoveryValidationExecutionAssertions(
+                CleanupComplete: true,
+                FaultObserved: true,
+                RecoveryObserved: true,
+                IndependentControlSucceeded: true,
+                TenantIsolationPreserved: true,
+                UnauthorizedMutationAbsent: true,
+                StateReconstructable: true,
+                ImmutableSourceOnly: true,
+                MailboxReingestionAbsent: true),
+        }, cancellationToken).ConfigureAwait(false);
+        foreach (string dependency in ScopedOutageDependencies.All)
+        {
+            await sink.RecordAsync(ContainedScopedOutageReport(runId, started) with { Dependency = dependency }, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 

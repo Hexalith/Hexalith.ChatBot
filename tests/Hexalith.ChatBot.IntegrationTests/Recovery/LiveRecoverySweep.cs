@@ -80,7 +80,14 @@ internal sealed class LiveRecoverySweep
         //    into `retention_failure_marker_invalid` both in process and after upload. The producer owns this root,
         //    so it starts it empty rather than filtering foreign markers at load -- the gate must keep treating a
         //    run-mismatched marker as fail-closed proof of tampering.
-        string canonicalEvidenceDirectory = Path.Combine(RepositoryRoot(), "TestResults", "live-recovery", runId);
+        string? producerRoot = Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_PRODUCER_ROOT");
+        if (producerRoot is not null && !Path.IsPathFullyQualified(producerRoot))
+        {
+            throw new InvalidOperationException("HEXALITH_CHATBOT_RECOVERY_PRODUCER_ROOT must be an absolute directory.");
+        }
+
+        string canonicalEvidenceDirectory = Path.Combine(
+            producerRoot ?? Path.Combine(RepositoryRoot(), "TestResults", "live-recovery"), runId);
         string markerRoot = RetentionFailureDirectory(canonicalEvidenceDirectory);
         if (Directory.Exists(markerRoot))
         {
@@ -103,6 +110,7 @@ internal sealed class LiveRecoverySweep
             // cross-context request still fails closed instead of silently using another local service.
             "--ChatBot:Projects:Endpoint=http://localhost:65535",
             $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
+            "--ChatBot:Memories:Endpoint=http://localhost:65535",
             $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
 
             // ChatBot:LiveRecoveryValidation:MailboxClientSecret is the primary key (aligned with the Server
@@ -551,8 +559,7 @@ internal sealed class LiveRecoverySweep
                 // the per-manifest staleness branch could ever fire.
                 //
                 // This in-process evaluation is a fast smoke check only. The authoritative, independent evaluation runs in
-                // the separate `live-recovery-evidence-gate` workflow job (LiveRecoveryEvidenceGateReplayTests) against
-                // the uploaded artifact, so the run no longer grades its own homework.
+                // a separate nightly process after the producer exits, using only the retained bundle and pinned policy.
                 LiveRecoveryValidationEvidenceGateDecision gate = LiveRecoveryValidationEvidenceGate.Evaluate(
                     attempt,
                     new LiveRecoveryValidationGatePolicy(

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,6 +14,213 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 public sealed class LiveRecoveryEvidenceGateReplayTests
 {
     private const string RetentionFailuresDirectoryName = "retention-failures";
+
+    private const string EvidenceDirectoryVariable = "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_DIR";
+    private const int MaximumRetainedFileBytes = 16 * 1024 * 1024;
+    private const string EvidenceRequiredVariable = "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED";
+
+    /// <summary>Judges the retained bundle in the separate nightly gate process.</summary>
+    [Fact]
+    public async Task RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess()
+    {
+        string? artifactRoot = Environment.GetEnvironmentVariable(EvidenceDirectoryVariable);
+        bool required = string.Equals(Environment.GetEnvironmentVariable(EvidenceRequiredVariable), "1", StringComparison.Ordinal);
+        if (required && string.IsNullOrWhiteSpace(artifactRoot))
+        {
+            throw new InvalidOperationException($"{EvidenceDirectoryVariable} is required for recovery evidence replay.");
+        }
+
+        Assert.SkipWhen(string.IsNullOrWhiteSpace(artifactRoot), $"Set {EvidenceDirectoryVariable} to replay a retained bundle.");
+        LiveRecoveryValidationGatePolicy policy = LiveRecoveryValidationGatePolicy.ForRelease(
+            ReadGateSetting("HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS").Split(',', StringSplitOptions.TrimEntries),
+            targetDeviationsBlockRelease: true,
+            RecoveryValidationEvidenceManifest.LiveDriverMode,
+            TimeSpan.FromHours(ReadGateNumber("HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS")),
+            expectedDatasetVersion: ReadGateSetting("HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASET_VERSION"),
+            minimumDatasetVolume: ReadGateNumber("HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME"),
+            maximumMeasurableRecoveryCeilingSeconds: ReadGateNumber("HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS"),
+            requiredRepositoryCommit: ReadGateSetting("HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT"));
+
+        LiveRecoveryValidationEvidenceGateDecision decision = await ReplayRetainedArtifactAsync(
+            artifactRoot!, policy, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        foreach (string limitation in decision.ClaimLimitationReasons)
+        {
+            TestContext.Current.TestOutputHelper?.WriteLine($"claim limitation: {limitation}");
+        }
+
+        decision.IsStopShip.ShouldBeFalse(
+            $"The recovery evidence gate rejected the retained evidence: {string.Join(", ", decision.StopShipReasons)}.");
+    }
+
+    /// <summary>Loads only the retained bundle and evaluates it against a policy from the gate caller.</summary>
+    internal static async Task<LiveRecoveryValidationEvidenceGateDecision> ReplayRetainedArtifactAsync(
+        string artifactRoot,
+        LiveRecoveryValidationGatePolicy policy,
+        CancellationToken cancellationToken)
+    {
+        JsonSerializerOptions serializerOptions = new(JsonSerializerDefaults.Web)
+        {
+            AllowDuplicateProperties = false,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+        LiveRecoveryValidationAttemptSummary summary = await ReadRetainedJsonAsync<LiveRecoveryValidationAttemptSummary>(
+            Path.Combine(artifactRoot, RetentionFailuresDirectoryName, LiveRecoveryValidationAttemptSummary.FileName),
+            "attempt summary", serializerOptions, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> markers = await LoadRetentionFailureMarkersAsync(
+            artifactRoot, serializerOptions, cancellationToken).ConfigureAwait(false);
+
+        List<RecoveryValidationEvidenceManifest> manifests = [];
+        string manifestRoot = Path.Combine(artifactRoot, "live-recovery");
+        if (Directory.Exists(manifestRoot))
+        {
+            const string ManifestSuffix = ".manifest.json";
+            HashSet<string> reportPaths = Directory.EnumerateFiles(manifestRoot, "*.report.json", SearchOption.AllDirectories)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (string path in Directory.EnumerateFiles(manifestRoot, $"*{ManifestSuffix}", SearchOption.AllDirectories))
+            {
+                RecoveryValidationEvidenceManifest manifest = await ReadRetainedJsonAsync<RecoveryValidationEvidenceManifest>(
+                    path, "manifest", serializerOptions, cancellationToken).ConfigureAwait(false);
+                string reportPath = $"{path[..^ManifestSuffix.Length]}.report.json";
+                using JsonDocument report = await ReadRetainedJsonAsync<JsonDocument>(
+                    reportPath, "report", serializerOptions, cancellationToken,
+                    manifest.ReportSha256 ?? string.Empty).ConfigureAwait(false);
+                if (!MatchesReport(manifest, report.RootElement))
+                {
+                    throw new InvalidDataException("A retained recovery report does not match its manifest.");
+                }
+
+                _ = reportPaths.Remove(reportPath);
+                manifests.Add(manifest);
+            }
+
+            if (reportPaths.Count != 0)
+            {
+                throw new InvalidDataException("A retained recovery report is missing its manifest.");
+            }
+        }
+
+        LiveRecoveryValidationEvidenceAttempt attempt = new(
+            summary.Enabled,
+            summary.RunId,
+            summary.StartedAtUtc,
+            summary.CompletedAtUtc,
+            summary.LatestAttemptCompletedSuccessfully,
+            manifests,
+            markers,
+            summary.AlertsDeliveredByJob);
+        return LiveRecoveryValidationEvidenceGate.Evaluate(attempt, policy, DateTimeOffset.UtcNow);
+    }
+
+    private static bool MatchesReport(RecoveryValidationEvidenceManifest manifest, JsonElement report)
+    {
+        string scenarioProperty = manifest.JobId switch
+        {
+            LiveRecoveryValidationJobs.ProjectionRebuild => "datasetRef",
+            LiveRecoveryValidationJobs.ScopedOutage => "dependency",
+            _ => "scenario",
+        };
+        if (!MatchesString(report, "correlationId", manifest.RunId) ||
+            !MatchesString(report, "tenantRef", manifest.TenantRef) ||
+            !MatchesString(report, scenarioProperty, manifest.Scenario) ||
+            !MatchesString(report, "verdict", manifest.Verdict) ||
+            !MatchesString(report, "reasonCode", manifest.ReasonCode) ||
+            !MatchesInstant(report, "startedAtUtc", manifest.StartedAtUtc) ||
+            !MatchesInstant(report, "endedAtUtc", manifest.EndedAtUtc))
+        {
+            return false;
+        }
+
+        JsonElement cleanup = manifest.JobId == LiveRecoveryValidationJobs.ControlledLossPath
+            ? report : report.TryGetProperty("executionAssertions", out JsonElement execution) ? execution : default;
+        bool cleanupComplete = cleanup.ValueKind == JsonValueKind.Object &&
+            cleanup.TryGetProperty("cleanupComplete", out JsonElement complete) && complete.ValueKind == JsonValueKind.True;
+        if (manifest.Assertions is null || !manifest.Assertions.TryGetValue("cleanup-complete", out bool retainedCleanup) ||
+            retainedCleanup != cleanupComplete)
+        {
+            return false;
+        }
+
+        return manifest.JobId switch
+        {
+            LiveRecoveryValidationJobs.Continuity => MatchesSeconds(report, manifest, "measuredRpo", "rpo") &&
+                MatchesSeconds(report, manifest, "measuredRto", "rto"),
+            LiveRecoveryValidationJobs.ControlledLossPath => MatchesSeconds(report, manifest, "measuredRpo", "rpo"),
+            LiveRecoveryValidationJobs.ProjectionRebuild => MatchesSeconds(report, manifest, "measuredRebuildDuration", "rebuild-duration"),
+            LiveRecoveryValidationJobs.ScopedOutage => MatchesSeconds(report, manifest, "scopeRecordingLatency", "scope-recording-latency"),
+            _ => false,
+        };
+    }
+
+    private static bool MatchesInstant(JsonElement report, string name, DateTimeOffset expected)
+        => report.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.String &&
+            property.TryGetDateTimeOffset(out DateTimeOffset actual) && actual == expected;
+
+    private static bool MatchesSeconds(JsonElement report, RecoveryValidationEvidenceManifest manifest, string name, string measurement)
+        => manifest.MeasurementsSeconds is not null && manifest.MeasurementsSeconds.TryGetValue(measurement, out double expected) &&
+            report.TryGetProperty(name, out JsonElement property) && property.ValueKind == JsonValueKind.String &&
+            TimeSpan.TryParseExact(property.GetString(), "c", CultureInfo.InvariantCulture, out TimeSpan actual) &&
+            actual.TotalSeconds.Equals(expected);
+
+    private static bool MatchesString(JsonElement report, string name, string expected)
+        => report.ValueKind == JsonValueKind.Object &&
+            report.TryGetProperty(name, out JsonElement property) &&
+            property.ValueKind == JsonValueKind.String &&
+            string.Equals(property.GetString(), expected, StringComparison.Ordinal);
+
+    private static async Task<T> ReadRetainedJsonAsync<T>(
+        string path, string evidenceKind, JsonSerializerOptions serializerOptions, CancellationToken cancellationToken,
+        string? expectedSha256 = null)
+        where T : class
+    {
+        try
+        {
+            using FileStream stream = File.OpenRead(path);
+            if (stream.Length > MaximumRetainedFileBytes)
+            {
+                throw new InvalidDataException($"The retained recovery {evidenceKind} exceeds its size limit.");
+            }
+
+            byte[] bytes = new byte[(int)stream.Length];
+            await stream.ReadExactlyAsync(bytes, cancellationToken).ConfigureAwait(false);
+            if (stream.ReadByte() != -1)
+            {
+                throw new InvalidDataException($"The retained recovery {evidenceKind} changed while being read.");
+            }
+
+            T document = JsonSerializer.Deserialize<T>(bytes, serializerOptions)
+                ?? throw new InvalidDataException($"The retained recovery {evidenceKind} is empty.");
+            if (expectedSha256 is not null && !string.Equals(
+                Convert.ToHexStringLower(SHA256.HashData(bytes)), expectedSha256, StringComparison.Ordinal))
+            {
+                (document as IDisposable)?.Dispose();
+                throw new InvalidDataException($"The retained recovery {evidenceKind} does not match its manifest.");
+            }
+
+            return document;
+        }
+        catch (JsonException)
+        {
+            throw new InvalidDataException($"The retained recovery {evidenceKind} is malformed.");
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new InvalidDataException($"The retained recovery {evidenceKind} is missing.");
+        }
+    }
+
+    private static string ReadGateSetting(string name)
+    {
+        string? value = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException($"{name} is required for recovery evidence replay.")
+            : value;
+    }
+
+    private static int ReadGateNumber(string name)
+        => int.TryParse(ReadGateSetting(name), NumberStyles.None, CultureInfo.InvariantCulture, out int value) && value > 0
+            ? value
+            : throw new InvalidOperationException($"{name} must be a positive integer for recovery evidence replay.");
+
     [Fact]
     public async Task RetentionFailureMarkersAreDiscoveredWithoutAnyManifest()
     {
@@ -110,7 +319,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
         string artifactRoot = Path.Combine(root, "uploaded-TestResults");
         string uploadedSideChannelRoot = Path.Combine(artifactRoot, RetentionFailuresDirectoryName);
         string runId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
-        DateTimeOffset startedAtUtc = DateTimeOffset.Parse("2026-08-27T12:00:00Z", CultureInfo.InvariantCulture);
+        DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(3);
         DateTimeOffset failedAtUtc = startedAtUtc + TimeSpan.FromMinutes(1);
         DateTimeOffset completedAtUtc = startedAtUtc + TimeSpan.FromMinutes(2);
         FileRecoveryValidationEvidenceRetentionFailureSink sink = new(
@@ -170,41 +379,9 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             File.Copy(source, Path.Combine(uploadedSideChannelRoot, Path.GetFileName(source)));
         }
 
-        JsonSerializerOptions serializerOptions = new(JsonSerializerDefaults.Web);
-        IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> retainedMarkers =
-            await LoadRetentionFailureMarkersAsync(
-                artifactRoot,
-                serializerOptions,
-                TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        string retainedSummaryPath = Directory.GetFiles(
-            uploadedSideChannelRoot,
-            LiveRecoveryValidationAttemptSummary.FileName,
-            SearchOption.TopDirectoryOnly).ShouldHaveSingleItem();
-        await using FileStream summaryStream = File.OpenRead(retainedSummaryPath);
-        LiveRecoveryValidationAttemptSummary retainedSummary = (await JsonSerializer
-            .DeserializeAsync<LiveRecoveryValidationAttemptSummary>(
-                summaryStream,
-                serializerOptions,
-                TestContext.Current.CancellationToken)
-            .ConfigureAwait(true)).ShouldNotBeNull();
-
-        LiveRecoveryValidationEvidenceGateDecision decision = LiveRecoveryValidationEvidenceGate.Evaluate(
-            new LiveRecoveryValidationEvidenceAttempt(
-                retainedSummary.Enabled,
-                retainedSummary.RunId,
-                retainedSummary.StartedAtUtc,
-                retainedSummary.CompletedAtUtc,
-                retainedSummary.LatestAttemptCompletedSuccessfully,
-                Evidence: [],
-                RetentionFailureMarkers: retainedMarkers,
-                AlertsDeliveredByJob: retainedSummary.AlertsDeliveredByJob),
-            new LiveRecoveryValidationGatePolicy(
-                ConfiguredProjectionDatasets: ["recovery-baseline"],
-                TargetDeviationsBlockRelease: true,
-                RequiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
-                MaximumEvidenceAge: TimeSpan.FromDays(8)),
-            completedAtUtc + TimeSpan.FromMinutes(1));
+        LiveRecoveryValidationEvidenceGateDecision decision = await ReplayRetainedArtifactAsync(
+            artifactRoot, ReplayPolicy(),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
 
         foreach (string jobId in LiveRecoveryValidationJobs.All)
         {

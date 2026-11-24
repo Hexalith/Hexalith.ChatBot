@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Identities;
@@ -221,6 +223,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         string scenarioId = ChatBotCorrelationId.New().Value;
         string expectedScope = report is ScopedOutageDegradationReport scoped ? scoped.ExpectedScope : NotApplicableScope;
         string observedScope = report is ScopedOutageDegradationReport observed ? observed.ObservedScope : NotApplicableScope;
+        byte[] reportBytes = JsonSerializer.SerializeToUtf8Bytes(report, SerializerOptions);
         RecoveryValidationEvidenceManifest manifest = new()
         {
             RunId = ReportCorrelationId(report),
@@ -249,6 +252,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             ExpectedScope = expectedScope,
             ObservedScope = observedScope,
             ReportKind = reportKind,
+            ReportSha256 = Convert.ToHexStringLower(SHA256.HashData(reportBytes)),
             Verdict = verdict,
             ReasonCode = reasonCode,
             MeasurementsSeconds = measurements,
@@ -267,7 +271,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             ArtifactLocators = new Dictionary<string, string>
             {
                 ["test-output"] = $"{options.EvidenceLocator}/results.trx",
-                ["reports"] = $"{options.EvidenceLocator}/reports",
+                ["reports"] = $"{options.EvidenceLocator}/live-recovery",
             },
             ProjectionPreRebuildSchemaVersion = (report as ProjectionRebuildReport)?.PreRebuildSchemaVersion,
             ProjectionRebuiltSchemaVersion = (report as ProjectionRebuildReport)?.RebuiltSchemaVersion,
@@ -319,9 +323,9 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                 manifestPath,
                 JsonSerializer.Serialize(manifest, SerializerOptions),
                 cancellationToken).ConfigureAwait(false);
-            await File.WriteAllTextAsync(
+            await File.WriteAllBytesAsync(
                 reportPath,
-                JsonSerializer.Serialize(report, SerializerOptions),
+                reportBytes,
                 cancellationToken).ConfigureAwait(false);
         }
         catch

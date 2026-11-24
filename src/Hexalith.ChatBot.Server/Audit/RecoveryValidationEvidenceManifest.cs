@@ -61,6 +61,9 @@ internal sealed record RecoveryValidationEvidenceManifest
     public required IReadOnlyList<string> ResidualIds { get; init; }
     public required IReadOnlyDictionary<string, string> ArtifactLocators { get; init; }
 
+    /// <summary>Gets the SHA-256 digest of the paired report's serialized bytes, when available.</summary>
+    public string? ReportSha256 { get; init; }
+
     /// <summary>Gets the independently read baseline projection schema stamp for projection evidence.</summary>
     public string? ProjectionPreRebuildSchemaVersion { get; init; }
 
