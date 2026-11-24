@@ -23,6 +23,8 @@ public static class UiTransportFailureCases
             foreach (string kind in new[] { "http", "timeout", "task-timeout", "canceled-token-timeout" }) cases.Add(kind, 0, "dependency_degraded");
             cases.Add("programming", 0, "generic_denial");
             cases.Add("unknown-code", 503, "generic_denial");
+            cases.Add("invalid-category", 503, "generic_denial");
+            cases.Add("malformed-body", 503, "generic_denial");
             cases.Add("alias-timeout", 503, "dependency_degraded");
             cases.Add("alias-forbidden", 403, "authorization_denied");
             cases.Add("alias-conflict", 409, "invalid_lifecycle_transition");
@@ -43,6 +45,10 @@ public static class UiTransportFailureCases
             "canceled-token-timeout" => new TaskCanceledException("restricted /private/secret", new TimeoutException("restricted"), new CancellationToken(canceled: true)),
             "programming" => new InvalidOperationException("restricted /private/secret"),
             "untyped" => new HexalithChatBotApiException("restricted", status, "restricted", null!, null),
+            "malformed-body" => new HexalithChatBotApiException("restricted", status, "restricted", null!,
+                new Newtonsoft.Json.JsonSerializationException("invalid problem category")),
+            "invalid-category" => new HexalithChatBotApiException<ProblemDetails>("restricted", status, "restricted", null!,
+                new ProblemDetails { Code = "dependency_degraded", Category = (ProblemDetailsCategory)999 }, null),
             _ => new HexalithChatBotApiException<ProblemDetails>("restricted", status, "restricted", null!,
                 kind == "null-body" ? null! : new ProblemDetails { Code = kind switch
                 {

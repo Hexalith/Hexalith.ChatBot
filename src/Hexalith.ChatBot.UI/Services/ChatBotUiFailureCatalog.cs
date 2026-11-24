@@ -19,7 +19,9 @@ internal static class ChatBotUiFailureCatalog
     internal static string Resolve(Exception exception)
         => exception switch
         {
+            HexalithChatBotApiException<ProblemDetails> { Result: { } problem } when !Enum.IsDefined(problem.Category) => ChatBotMessageCodes.GenericDenial,
             HexalithChatBotApiException<ProblemDetails> { Result.Code: { } code } when !string.IsNullOrWhiteSpace(code) => AssociationReviewFailureCatalog.CatalogCode(code),
+            HexalithChatBotApiException { InnerException: Newtonsoft.Json.JsonException } => ChatBotMessageCodes.GenericDenial,
             HexalithChatBotApiException api => api.StatusCode switch
             {
                 401 => ChatBotMessageCodes.AuthenticationDenied,

@@ -1563,9 +1563,16 @@ resolution: Failure cards show positive retry copy only when the catalogue, reta
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Preserve instance-specific backend retry permissions through code-only UI failure state.
   evidence: F-B4/F-E4; the baseline effects already discarded Retryable and ClientAction and enabled non-authorization load retries. Define the state fields and rendering intersection before changing this pre-existing behavior; a typed audit_unavailable with Retryable=false/ClientAction=None currently retains catalog retry guidance.
-- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
-  summary: Define malformed typed-problem category handling at the UI failure state boundary.
-  evidence: F-B5; both baseline and current effects reduce typed problem metadata to a code, so a hand-built known code with an undefined category loses that category before rendering. Align this existing UI boundary with the server and adapter validation policy without inferring a new state contract.
+### DW-146: Define malformed typed-problem category handling at the UI failure state boundary.
+
+origin: legacy ledger entry from Deferred from: Story 1.4 workflow review (2026-10-14)
+source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+severity: medium
+reason: F-B5; both baseline and current effects reduce typed problem metadata to a code, so a hand-built known code with an undefined category loses that category before rendering. Align this existing UI boundary with the server and adapter validation policy without inferring a new state contract.
+status: done 2026-11-24
+resolution: Typed problems with undefined categories and generated-client JSON parse failures resolve to generic denial. The shared effect regressions cover both even when the transport status would normally suggest a retry.
+
+
 
 ## Deferred from: code review of 1-6-canonical-lifecycle-state-model-and-transition-enforcement (2026-10-15)
 
