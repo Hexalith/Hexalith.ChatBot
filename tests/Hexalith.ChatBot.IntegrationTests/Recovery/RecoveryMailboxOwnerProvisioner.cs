@@ -143,19 +143,61 @@ internal static class RecoveryMailboxOwnerProvisioner
         }
     }
 
-    // The bearer must name the identity the grants are keyed to. The grant id and expiry claims are deliberately not
-    // read: no server code consumes them, and copying them broke the aggregate's 30-day cap and grant-id reuse rule.
-    private static void AssertMailboxTokenIdentity(string token)
+    /// <summary>Checks that the bearer names the identity the recovery mailbox grants authorize.</summary>
+    /// <param name="token">The recovery mailbox bearer.</param>
+    internal static void AssertMailboxTokenIdentity(string token)
     {
-        string[] parts = token.Split('.');
-        if (parts.Length != 3) { throw new InvalidOperationException("The mailbox token is not a JWT."); }
+        string[] parts = token.Split('.', 4);
+        if (parts.Length != 3)
+        {
+            throw new InvalidOperationException("The mailbox token is not a JWT.");
+        }
+
         string encoded = parts[1].Replace('-', '+').Replace('_', '/');
         encoded = encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=');
-        using JsonDocument claims = JsonDocument.Parse(Convert.FromBase64String(encoded));
-        JsonElement root = claims.RootElement;
-        root.GetProperty("chatbot:service-client-id").GetString().ShouldBe(RecoveryValidationTopology.MailboxClientId);
-        root.GetProperty("eventstore:tenant").GetString().ShouldBe(Tenant);
-        root.GetProperty("chatbot:service-client-command").GetString().ShouldBe(ProbeOperation);
+        try
+        {
+            using JsonDocument claims = JsonDocument.Parse(Convert.FromBase64String(encoded));
+            JsonElement root = claims.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidOperationException("The mailbox token JWT payload is invalid.");
+            }
+
+            // Grant identity comes from these claims. Grant IDs and expiries are issued separately by the owner.
+            string clientId = RequiredMailboxClaim(root, "chatbot:service-client-id");
+            string tenant = RequiredMailboxClaim(root, "eventstore:tenant");
+            string operation = RequiredMailboxClaim(root, "chatbot:service-client-command");
+            if (clientId != RecoveryValidationTopology.MailboxClientId || tenant != Tenant || operation != ProbeOperation)
+            {
+                throw new InvalidOperationException("The mailbox token identity does not match the recovery mailbox.");
+            }
+        }
+        catch (Exception exception) when (exception is FormatException or JsonException)
+        {
+            throw new InvalidOperationException("The mailbox token JWT payload is invalid.");
+        }
+    }
+
+    private static string RequiredMailboxClaim(JsonElement claims, string name)
+    {
+        if (claims.TryGetProperty(name, out JsonElement claim) && claim.ValueKind == JsonValueKind.String)
+        {
+            try
+            {
+                if (claim.GetString() is { Length: > 0 } value)
+                {
+                    return value;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // JsonDocument defers decoding string values until they are read.
+                throw new InvalidOperationException("The mailbox token JWT payload is invalid.");
+            }
+        }
+
+        throw new InvalidOperationException("The mailbox token is missing a required identity claim.");
     }
 
     private static async Task SubmitChatBotGrantAsync(HttpClient client, string token, HttpClient eventStore,

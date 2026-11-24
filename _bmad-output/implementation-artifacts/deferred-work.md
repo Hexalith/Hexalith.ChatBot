@@ -2122,6 +2122,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
   summary: Recovery mailbox token identity parsing has no bounded JWT error path.
   evidence: `RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity` parses the bearer payload with `Convert.FromBase64String` and `JsonDocument.Parse` and reads required claims with `GetProperty` and no catch. A non-Base64 or non-JSON payload fails as `FormatException`, `JsonException`, or `KeyNotFoundException` instead of the mailbox-token error used for a non-JWT shape. This is later live-harness code, not the five-boundary production change.
+  resolution: Resolved 2026-11-24. Malformed encodings, invalid payloads, missing or mistyped claims, and mismatched identities produce fixed diagnostics without bearer contents. The accepted identity and all 67 live continuity contract cases passed.
 
 ## Retired: spec-chatbot-ci-cd-alignment (2026-11-21)
 

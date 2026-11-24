@@ -16,6 +16,97 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// <summary>Always-run contracts for the live Tier-3 startup boundary.</summary>
 public sealed class LiveContinuityAspireE2eContractTests
 {
+    /// <summary>Accepts the exact mailbox client, tenant, and operation used by the owner grants.</summary>
+    [Fact]
+    public void MailboxBearerWithExpectedIdentityShouldBeAccepted()
+        => RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity(MailboxToken(new Dictionary<string, string>
+        {
+            ["chatbot:service-client-id"] = RecoveryValidationTopology.MailboxClientId,
+            ["eventstore:tenant"] = RecoveryValidationTopology.StorageTenantRef,
+            ["chatbot:service-client-command"] = RecoveryMailboxOwnerProvisioner.ProbeOperation,
+        }));
+
+    /// <summary>Rejects a wrong claim without disclosing the bearer or the unexpected identity.</summary>
+    /// <param name="claim">The claim replaced by a mismatched value.</param>
+    [Theory]
+    [InlineData("chatbot:service-client-id")]
+    [InlineData("eventstore:tenant")]
+    [InlineData("chatbot:service-client-command")]
+    public void MailboxBearerWithMismatchedIdentityShouldBeRejected(string claim)
+    {
+        const string privateValue = "private-unexpected-identity";
+        Dictionary<string, string> claims = new()
+        {
+            ["chatbot:service-client-id"] = RecoveryValidationTopology.MailboxClientId,
+            ["eventstore:tenant"] = RecoveryValidationTopology.StorageTenantRef,
+            ["chatbot:service-client-command"] = RecoveryMailboxOwnerProvisioner.ProbeOperation,
+        };
+        claims[claim] = privateValue;
+        string token = MailboxToken(claims);
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity(token));
+
+        exception.Message.ShouldBe("The mailbox token identity does not match the recovery mailbox.");
+        exception.ToString().ShouldNotContain(token);
+        exception.ToString().ShouldNotContain(privateValue);
+    }
+
+    /// <summary>Reports invalid syntax and missing claim evidence with fixed diagnostics.</summary>
+    /// <param name="payload">The malformed or incomplete token payload.</param>
+    /// <param name="encodePayload">Whether to encode the payload as base64url.</param>
+    /// <param name="expectedMessage">The bounded public diagnostic.</param>
+    [Theory]
+    [InlineData("private%", false, "The mailbox token JWT payload is invalid.")]
+    [InlineData("private invalid JSON", true, "The mailbox token JWT payload is invalid.")]
+    [InlineData("[\"private-value\"]", true, "The mailbox token JWT payload is invalid.")]
+    [InlineData("{\"other-claim\":\"private-value\"}", true, "The mailbox token is missing a required identity claim.")]
+    [InlineData("{\"chatbot:service-client-id\":42}", true, "The mailbox token is missing a required identity claim.")]
+    public void MalformedMailboxBearerShouldHaveBoundedDiagnostic(string payload, bool encodePayload, string expectedMessage)
+    {
+        string token = $"header.{(encodePayload ? Base64Url(payload) : payload)}.signature";
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity(token));
+
+        exception.Message.ShouldBe(expectedMessage);
+        exception.InnerException.ShouldBeNull();
+        exception.ToString().ShouldNotContain(token);
+        exception.ToString().ShouldNotContain(payload);
+    }
+
+    /// <summary>Decoding invalid Unicode in a claim must not expose the decoder exception or token contents.</summary>
+    /// <param name="invalidUtf8">Whether the payload contains invalid UTF-8 instead of an unpaired JSON surrogate.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MailboxBearerWithInvalidClaimUnicodeShouldHideDecoderDetails(bool invalidUtf8)
+    {
+        byte[] payload = invalidUtf8
+            ? [.. "{\"chatbot:service-client-id\":\"private"u8, 0xFF, .. "\"}"u8]
+            : """{"chatbot:service-client-id":"private\uD800"}"""u8.ToArray();
+        string encoded = Base64Url(payload);
+        string token = $"header.{encoded}.signature";
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity(token));
+
+        exception.Message.ShouldBe("The mailbox token JWT payload is invalid.");
+        exception.InnerException.ShouldBeNull();
+        exception.ToString().ShouldNotContain(token);
+        exception.ToString().ShouldNotContain(encoded);
+        exception.ToString().ShouldNotContain("private");
+    }
+
+    private static string MailboxToken(IReadOnlyDictionary<string, string> claims)
+        => $"header.{Base64Url(JsonSerializer.Serialize(claims))}.signature";
+
+    private static string Base64Url(string value)
+        => Base64Url(Encoding.UTF8.GetBytes(value));
+
+    private static string Base64Url(byte[] value)
+        => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
     [Theory]
     [InlineData(RecoveryNotificationIdentity.PreFaultPhase)]
     [InlineData(RecoveryNotificationIdentity.LossPhase)]
