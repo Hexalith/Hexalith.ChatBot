@@ -2232,6 +2232,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Sibling ChatBot health routes require the boundary policy, but ordinary tests pin anonymous 401 only for `/health/chatbot`, and the live workflow probe still GETs `/health/chatbot/workflows` with no credentials.
   evidence: `ChatBotCompatibilityEndpointExtensions.cs:43-64` vs `ServerBootstrapApiTests` `/health/chatbot` only; `TrivialGovernedCommandAspireE2eTests.cs:1104-1107` expects 200. Later health-boundary change.
+  resolution: Resolved 2026-11-24. An anonymous-denial theory in ServerBootstrapApiTests covers `/health/chatbot`, `/health/chatbot/workflows` and `/health/chatbot/periodic-enforcement`. Each route must be mapped once for GET with the ChatBot boundary policy and answer an anonymous caller with 401 and `authentication_denied`, so the SDK fallback denial cannot mask a missing route. The authenticated health check is kept. The live workflow probe already sends a tenant-bound bearer since 065ded0. A moved workflows route failed only its row, and an unpoliced route stopped the host at the EventStore endpoint inventory. ServerBootstrapApiTests passed all 110 cases.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Nightly recovery/release hooks no longer fail closed when they discover zero tests.

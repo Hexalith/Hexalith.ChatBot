@@ -868,22 +868,46 @@ public sealed class ServerBootstrapApiTests
         shared.JsonSerializerOptions.Converters.ShouldNotContain(static converter => converter is EnumMemberWireValueJsonConverterFactory);
     }
 
+    /// <summary>
+    /// The EventStore conforming host leaves only /health, /alive and /ready anonymous, so every ChatBot status route
+    /// is mapped behind the ChatBot boundary policy and answers an anonymous caller with the typed authentication
+    /// denial. The endpoint inventory check keeps the SDK fallback policy, which also denies unmapped routes, from
+    /// masking a status route that is missing or no longer carries the boundary policy.
+    /// </summary>
+    /// <param name="route">The ChatBot status route an anonymous caller reads.</param>
+    [Theory]
+    [InlineData("/health/chatbot")]
+    [InlineData("/health/chatbot/workflows")]
+    [InlineData("/health/chatbot/periodic-enforcement")]
+    public async Task ChatBotCompatibilityHealthEndpointShouldDenyAnonymousCallers(string route)
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        RouteEndpoint endpoint = factory.Services.GetServices<EndpointDataSource>()
+            .SelectMany(static source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Where(candidate => string.Equals(candidate.RoutePattern.RawText, route, StringComparison.Ordinal)
+                && candidate.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains(HttpMethod.Get.Method, StringComparer.OrdinalIgnoreCase) == true)
+            .ShouldHaveSingleItem();
+        endpoint.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>()
+            .ShouldContain(static data => data.Policy == ChatBotApplicationBoundaryPolicy.Name);
+
+        using HttpResponseMessage denied = await client
+            .GetAsync(route, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        denied.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        using JsonDocument problem = JsonDocument.Parse(await denied.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true));
+        problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
+    }
+
     [Fact]
     public async Task ChatBotCompatibilityHealthEndpointShouldReturnHealthyStatus()
     {
-        // The EventStore conforming host leaves only /health, /alive and /ready anonymous, so the ChatBot status route
-        // answers an anonymous caller with the typed authentication denial and reports health to an authenticated one.
-        using WebApplicationFactory<Program> anonymousFactory = new();
-        using HttpClient anonymous = anonymousFactory.CreateClient();
-        using HttpResponseMessage denied = await anonymous
-            .GetAsync("/health/chatbot", TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        denied.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        using (JsonDocument problem = JsonDocument.Parse(await denied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
-        {
-            problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
-        }
-
+        // The anonymous denial is pinned per status route above; an authenticated caller reads the module health.
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
         using HttpClient client = factory.CreateClient();
 
