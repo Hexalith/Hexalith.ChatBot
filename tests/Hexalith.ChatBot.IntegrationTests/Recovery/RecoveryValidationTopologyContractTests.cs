@@ -508,6 +508,32 @@ public sealed class RecoveryValidationTopologyContractTests
         exception.Message.ShouldContain("41101");
     }
 
+    /// <summary>
+    /// Proves the AppHost reserves the fixed daprd ports of the Memories sidecar, which the Memories hosting extension
+    /// attaches outside <c>AddHexalithChatBot</c>, so an internal gRPC port that reuses one fails closed at composition.
+    /// </summary>
+    /// <param name="appId">The sidecar configured with the reused port.</param>
+    /// <param name="port">The Memories daprd port it reuses.</param>
+    /// <param name="portKind">The kind of Memories daprd port the collision names.</param>
+    [Theory]
+    [InlineData("chatbot", "50002", "gRPC")]
+    [InlineData("eventstore-admin", "3502", "HTTP")]
+    public async Task AppHostRejectsADaprInternalGrpcPortBoundByTheMemoriesSidecarAsync(string appId, string port, string portKind)
+    {
+        string[] args =
+        [
+            $"--Dapr:InternalGrpcPorts:{appId}={port}",
+            .. RenderedRealmArgs,
+        ];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain($"port {port} is configured for '{appId}'");
+        exception.Message.ShouldContain($"the 'memories' daprd {portKind} port");
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("65536")]
@@ -884,6 +910,44 @@ public sealed class RecoveryValidationTopologyContractTests
         Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(distinct));
         Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(
             new ConfigurationBuilder().Build()));
+    }
+
+    /// <summary>
+    /// Proves a fixed daprd port of a sidecar composed outside the module collides with a configured internal gRPC
+    /// port, while the same configuration stays valid without the reservation and distinct ports still pass.
+    /// </summary>
+    [Fact]
+    public void ValidateUniqueInternalGrpcPortsRejectsAPortReservedByAnExternallyComposedSidecar()
+    {
+        IReadOnlyDictionary<int, string> reserved = ChatBotAspireModule.GetFixedDaprPorts(
+            "memories",
+            new DaprSidecarOptions { DaprHttpPort = 3502, DaprGrpcPort = 50002 });
+        reserved.Count.ShouldBe(2);
+        reserved[3502].ShouldBe("the 'memories' daprd HTTP port");
+        reserved[50002].ShouldBe("the 'memories' daprd gRPC port");
+        ChatBotAspireModule.GetFixedDaprPorts("memories", new DaprSidecarOptions()).ShouldBeEmpty();
+        IConfiguration colliding = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dapr:InternalGrpcPorts:eventstore"] = "41101",
+                ["Dapr:InternalGrpcPorts:projects"] = "50002",
+            })
+            .Build();
+        IConfiguration distinct = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dapr:InternalGrpcPorts:eventstore"] = "41101",
+                ["Dapr:InternalGrpcPorts:projects"] = "41102",
+            })
+            .Build();
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(colliding, reserved));
+
+        exception.Message.ShouldContain("port 50002 is configured for 'projects'");
+        exception.Message.ShouldContain("the 'memories' daprd gRPC port");
+        Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(colliding));
+        Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(distinct, reserved));
     }
 
     /// <summary>

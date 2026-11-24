@@ -156,6 +156,12 @@ IDaprSidecarResource memoriesSidecar = memories.Server.Resource.Annotations.OfTy
 DaprSidecarOptionsAnnotation memoriesSidecarOptions = memoriesSidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single();
 memoriesSidecar.Annotations.Remove(memoriesSidecarOptions);
 memoriesSidecar.Annotations.Add(new DaprSidecarOptionsAnnotation(memoriesSidecarOptions.Options with { Config = accessControlConfigPath }));
+// That extension also pins the sidecar's daprd HTTP and gRPC ports (3502 and 50002 by default) instead of allocating
+// them. Reserve both so a Dapr:InternalGrpcPorts entry that reuses one fails closed here, naming both owners, rather
+// than as an unpredictable bind failure when the sidecars start.
+ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(
+    builder.Configuration,
+    ChatBotAspireModule.GetFixedDaprPorts(memories.Server.Resource.Name, memoriesSidecarOptions.Options));
 EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
 
 // Any explicit owner setting selects the external/static path as a whole; incomplete overrides never fall back.

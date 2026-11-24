@@ -72,7 +72,8 @@ internal static class ChatBotAspireModule
     /// Every app id this module configures a DAPR sidecar for, across <see cref="AddHexalithChatBot"/> and
     /// <see cref="AddEventStoreAdmin"/>. Kept as one list so <see cref="ValidateUniqueInternalGrpcPorts"/> can check
     /// the whole topology's <c>Dapr:InternalGrpcPorts</c> configuration up front, even though the EventStore Admin
-    /// resources are composed by a separate call.
+    /// resources are composed by a separate call. Sidecars attached by another hosting extension, such as Memories,
+    /// are not listed here: their fixed daprd ports are passed to that validation as reserved ports instead.
     /// </summary>
     private static readonly string[] SidecarAppIds =
     [
@@ -147,12 +148,21 @@ internal static class ChatBotAspireModule
 
     /// <summary>
     /// Fails closed when two of this module's sidecars (<see cref="SidecarAppIds"/>) are configured with the same
-    /// <c>Dapr:InternalGrpcPorts:{appId}</c> value. Reads configuration fresh on every call rather than caching
-    /// anything in static state, so parallel test compositions with different overrides never observe each other.
+    /// <c>Dapr:InternalGrpcPorts:{appId}</c> value, or when one of them is configured with a port that a sidecar
+    /// composed outside this module already binds (<paramref name="reservedPorts"/>). Reads configuration fresh on
+    /// every call rather than caching anything in static state, so parallel test compositions with different
+    /// overrides never observe each other.
     /// </summary>
     /// <param name="configuration">The builder's configuration, read once per composition.</param>
-    internal static void ValidateUniqueInternalGrpcPorts(IConfiguration configuration)
+    /// <param name="reservedPorts">
+    /// Fixed ports bound by sidecars this module does not configure, keyed by port and naming the port's owner (see
+    /// <see cref="GetFixedDaprPorts"/>). <see langword="null"/> reserves nothing.
+    /// </param>
+    internal static void ValidateUniqueInternalGrpcPorts(
+        IConfiguration configuration,
+        IReadOnlyDictionary<int, string>? reservedPorts = null)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
         Dictionary<int, string> appIdByPort = new();
         foreach (string appId in SidecarAppIds)
         {
@@ -170,6 +180,13 @@ internal static class ChatBotAspireModule
                 continue;
             }
 
+            if (reservedPorts is not null && reservedPorts.TryGetValue(port, out string? reservedBy))
+            {
+                throw new InvalidOperationException(
+                    $"Dapr internal gRPC port {port} is configured for '{appId}' but is already bound by {reservedBy}. "
+                    + "Each Dapr:InternalGrpcPorts entry in this topology must use a distinct port.");
+            }
+
             if (appIdByPort.TryGetValue(port, out string? conflictingAppId))
             {
                 throw new InvalidOperationException(
@@ -179,6 +196,32 @@ internal static class ChatBotAspireModule
 
             appIdByPort[port] = appId;
         }
+    }
+
+    /// <summary>
+    /// Lists the fixed daprd HTTP and gRPC ports of a sidecar composed outside this module, such as the Memories
+    /// sidecar that its own hosting extension attaches, so <see cref="ValidateUniqueInternalGrpcPorts"/> can reserve
+    /// them. Ports the options leave unset are allocated dynamically and cannot be reserved up front.
+    /// </summary>
+    /// <param name="appId">The sidecar's app id, named as the owner in a collision message.</param>
+    /// <param name="options">The sidecar's effective options.</param>
+    /// <returns>The sidecar's fixed daprd ports, keyed by port and naming the port's owner.</returns>
+    internal static IReadOnlyDictionary<int, string> GetFixedDaprPorts(string appId, DaprSidecarOptions options)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentNullException.ThrowIfNull(options);
+        Dictionary<int, string> ports = new();
+        if (options.DaprHttpPort is int httpPort)
+        {
+            _ = ports.TryAdd(httpPort, $"the '{appId}' daprd HTTP port");
+        }
+
+        if (options.DaprGrpcPort is int grpcPort)
+        {
+            _ = ports.TryAdd(grpcPort, $"the '{appId}' daprd gRPC port");
+        }
+
+        return ports;
     }
 
     public static HexalithChatBotResources AddHexalithChatBot(
