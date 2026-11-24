@@ -2029,6 +2029,7 @@ archived: 2026-11-24
   evidence: `CommandGateway.SubmitAsync` calls `admission.RejectAuthorityLapseAsync` at `src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs:130`, `:162` and `:174` outside any `try`. `ChatBotCommandAdmissionPipeline.DenyAsync` (`:577-595`) awaits the audit write with no catch, and the endpoint (`ChatBotCompatibilityEndpointExtensions.cs:110-120`) has none, so a denial-audit failure there becomes an untyped 500. The late denial audit at `ChatBotCommandAdmissionPipeline.cs:343` is caught at `:409` and answers `dependency_degraded` through `CommandGateway.Denied` (`:349-351`); round 19 recorded it as `idempotency_outcome_unavailable`.
   reason: Pre-existing and outside the round-20 delta. It is latent because `InMemoryAuditWriter.RecordAuthorizationFailureAsync` cannot fail and ignores cancellation.
   closure: Together with R18-W1, when a durable denial-fact writer lands, classify the three call sites like `:83` (typed dependency-unavailable on an outage, propagation on a request abort), and add a `CommandGatewayTests` row per site whose denial-audit double fails.
+  resolution: Resolved 2026-11-24. All three pre-effect lapsed-authority sites preserve ownership cleanup and return a bounded dependency outcome on a writer fault. Tests cover each site with an active and an aborted caller.
 
 ## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-21, round 21)
 

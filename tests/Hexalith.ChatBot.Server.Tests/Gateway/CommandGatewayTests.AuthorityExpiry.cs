@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 
+using NSubstitute;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -186,6 +187,75 @@ public sealed partial class CommandGatewayTests
         state.IdentityRecords.ShouldHaveSingleItem().ShouldBe(beforeIdentity);
         audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         counter.ReadAndReset().ShouldHaveSingleItem().FailureCount.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData("before-preparation", false)]
+    [InlineData("after-preparation", false)]
+    [InlineData("during-dispatch", false)]
+    [InlineData("before-preparation", true)]
+    [InlineData("after-preparation", true)]
+    [InlineData("during-dispatch", true)]
+    public async Task LapsedAuthorityDenialAuditFailureKeepsTheGatewayOutcomeTyped(string boundary, bool abortCaller)
+    {
+        using CancellationTokenSource caller = new();
+        DateTimeOffset now = new TrustedAuthorityClock().UtcNow;
+        ISystemClock clock = Substitute.For<ISystemClock>();
+        int readsUntilExpiry = int.MaxValue;
+        clock.UtcNow.Returns(_ => --readsUntilExpiry > 0 ? now : now.AddSeconds(2));
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Transform = evidence => evidence with { ExpiresAt = now.AddSeconds(1) },
+        };
+        InMemoryCoarseIdempotencyStore real = new(clock);
+        TrustedAuthorityAdvancingIdempotencyStore idempotency = new(real, step =>
+        {
+            if (boundary == "after-preparation" && step == "preparation")
+            {
+                readsUntilExpiry = 1;
+            }
+        });
+        RecordingDispatcher dispatcher = new(onDispatch: () => throw new ChatBotAuthorityLapsedException());
+        RecordingAuditWriter audit = new()
+        {
+            OnPreCommit = () =>
+            {
+                if (boundary == "before-preparation")
+                {
+                    // Admission's final authority check succeeds. The receipt clock read then crosses the expiry.
+                    readsUntilExpiry = 2;
+                }
+            },
+            OnAuthorizationFailure = () =>
+            {
+                if (abortCaller)
+                {
+                    caller.Cancel();
+                }
+
+                throw new OperationCanceledException("audit-provider-diagnostic");
+            },
+        };
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, idempotencyStore: idempotency, auditWriter: audit,
+            requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner));
+        ChatBotCommandSubmission request = Submission(TrustedAuthorityFixture.Principal(),
+            new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ"));
+
+        if (abortCaller)
+        {
+            await Should.ThrowAsync<OperationCanceledException>(() => gateway.SubmitAsync(request, caller.Token).AsTask());
+        }
+        else
+        {
+            ChatBotGatewayResult result = await gateway.SubmitAsync(request, caller.Token);
+            result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+            Serialized(result.Problem).ShouldNotContain("audit-provider-diagnostic");
+        }
+
+        idempotency.Boundaries.Contains("preparation").ShouldBe(boundary != "before-preparation");
+        dispatcher.DispatchCount.ShouldBe(boundary == "during-dispatch" ? 1 : 0);
+        audit.AuthorizationFailures.ShouldHaveSingleItem();
+        real.Records.ShouldBeEmpty();
     }
 
     private sealed class AuthorityExpiryPreparationStore(IIdempotencyStore real, Action advance) : IIdempotencyStore
