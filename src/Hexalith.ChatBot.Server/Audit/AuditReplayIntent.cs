@@ -14,4 +14,22 @@ internal sealed record AuditReplayIntent(
     DateTimeOffset QueuedAt,
     CommandSubmissionResponse? AcceptedOutcome = null,
     string? CoarseKeyHash = null,
-    string? IdentityKeyHash = null);
+    string? IdentityKeyHash = null)
+{
+    /// <summary>Builds the replay request for an operation whose pre-commit audit failed.</summary>
+    internal static AuditReplayIntent ForPreCommitReplay(AuditEnvelope envelope, string reasonCode, DateTimeOffset queuedAt)
+    {
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        return new AuditReplayIntent(
+            AuditReplayIntentKind.PreCommitOperationReplay,
+            envelope.TenantId,
+            envelope.ActorId,
+            envelope.CommandName,
+            envelope.ResourceId,
+            envelope.CorrelationId,
+            envelope.IdempotencyKey,
+            reasonCode,
+            queuedAt);
+    }
+}

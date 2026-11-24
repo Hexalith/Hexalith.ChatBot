@@ -411,8 +411,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 AuditWriteResult rejectionAudit = await auditWriter.RecordPreCommitAsync(rejectionEnvelope, cancellationToken).ConfigureAwait(false);
                 if (!rejectionAudit.Succeeded)
                 {
-                    await QueueReplayIntentAsync(
-                        AuditReplayIntentKind.PreCommitOperationReplay,
+                    await QueuePreCommitReplayAsync(
                         rejectionEnvelope,
                         rejectionAudit.ReasonCode,
                         cancellationToken)
@@ -441,8 +440,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             AuditWriteResult preCommitAudit = await auditWriter.RecordPreCommitAsync(preCommitEnvelope, cancellationToken).ConfigureAwait(false);
             if (!preCommitAudit.Succeeded)
             {
-                await QueueReplayIntentAsync(
-                    AuditReplayIntentKind.PreCommitOperationReplay,
+                await QueuePreCommitReplayAsync(
                     preCommitEnvelope,
                     preCommitAudit.ReasonCode,
                     cancellationToken)
@@ -542,8 +540,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         }
     }
 
-    private async ValueTask QueueReplayIntentAsync(
-        AuditReplayIntentKind kind,
+    private async ValueTask QueuePreCommitReplayAsync(
         AuditEnvelope envelope,
         string reasonCode,
         CancellationToken cancellationToken)
@@ -552,16 +549,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         {
             await replayIntentQueue
                 .EnqueueAsync(
-                    new AuditReplayIntent(
-                        kind,
-                        envelope.TenantId,
-                        envelope.ActorId,
-                        envelope.CommandName,
-                        envelope.ResourceId,
-                        envelope.CorrelationId,
-                        envelope.IdempotencyKey,
-                        reasonCode,
-                        clock.UtcNow),
+                    AuditReplayIntent.ForPreCommitReplay(envelope, reasonCode, clock.UtcNow),
                     cancellationToken)
                 .ConfigureAwait(false);
         }

@@ -1374,15 +1374,15 @@ public sealed partial class CommandGatewayTests
             new ChatBotTenantBinding(BoundTenant));
     }
 
-    [Fact]
-    public void RetentionConfigurationChangePreCommitAuditIncludesSnapshotAndWindowEvidence()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RetentionConfigurationChangeAuditIncludesSnapshotAndWindowEvidence(bool postCommit)
     {
-        AuditEnvelope envelope = AuditEnvelopeFactory.PreCommit(
-            DirectContext(RetentionConfigurationChangeCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
-            new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.Proposed),
-            new FixedClock().UtcNow);
+        AuditCommitPhase phase = postCommit ? AuditCommitPhase.PostCommit : AuditCommitPhase.PreCommit;
+        AuditEnvelope envelope = ComplianceSnapshotEnvelope(RetentionConfigurationChangeCommand(), phase);
 
-        envelope.Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        envelope.Phase.ShouldBe(phase);
         foreach (string reference in new[]
         {
             "admin-operation:submit-retention-change", "admin-scope:compliance", "retention-change:retention-change-001",
@@ -1397,20 +1397,48 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public void InventoryChangePreCommitAuditIncludesSnapshotAndClassificationEvidence()
+    public void RetentionConfigurationAuditOutagePreservesThePreCommitReplayIdentity()
     {
-        SubmitDataClassInventoryChange command = DataClassInventoryChangeCommand();
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        const string coarseKey = "retention-replay-key";
+        DateTimeOffset now = new FixedClock().UtcNow;
+        ChatBotGatewayContext context = DirectContext(RetentionConfigurationChangeCommand(), commandId);
+        context.SetIdempotency(CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+            "command-execution", coarseKey, "retention-equivalence-key", now.AddMinutes(1)));
         AuditEnvelope envelope = AuditEnvelopeFactory.PreCommit(
-            DirectContext(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            context,
             new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.Proposed),
-            new FixedClock().UtcNow);
+            now);
 
-        envelope.Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        AuditReplayIntent intent = AuditReplayIntent.ForPreCommitReplay(envelope, AuditFailureReasonCodes.AuditUnavailable, now);
+
+        intent.Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        intent.CommandName.ShouldBe(typeof(ContractSubmitRetentionConfigurationChange).Name);
+        intent.ReasonCode.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        intent.TenantId.ShouldBe(BoundTenant);
+        intent.ActorId.ShouldBe(ActorId);
+        intent.ResourceId.ShouldBe(commandId);
+        intent.CorrelationId.ShouldBe(CorrelationId);
+        intent.IdempotencyKey.ShouldBe(coarseKey);
+        intent.AcceptedOutcome.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InventoryChangeAuditIncludesSnapshotAndClassificationEvidence(bool postCommit)
+    {
+        AuditCommitPhase phase = postCommit ? AuditCommitPhase.PostCommit : AuditCommitPhase.PreCommit;
+        SubmitDataClassInventoryChange command = DataClassInventoryChangeCommand();
+        AuditEnvelope envelope = ComplianceSnapshotEnvelope(command, phase);
+
+        envelope.Phase.ShouldBe(phase);
         foreach (string reference in new[]
         {
             "admin-operation:submit-data-class-inventory-change", "admin-scope:compliance", "inventory-change:inventory-change-001",
             "inventory-snapshot:inventory-snapshot-current", "inventory-snapshot:inventory-snapshot-proposed",
             "inventory-old-fingerprint:sha256:oldinventoryfingerprint001", "inventory-new-fingerprint:sha256:newinventoryfingerprint001",
+            "admin-role:compliance-admin", "policy-snapshot:policy-snapshot-admin-v1", "reason:data-class-inventory-update",
         })
         {
             envelope.SourceEvidenceRefs.ShouldContain(reference);
@@ -1425,6 +1453,18 @@ public sealed partial class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain($"export-eligibility:{classification.ExportEligibility}");
             envelope.SourceEvidenceRefs.ShouldContain($"redaction-sensitivity:{classification.RedactionSensitivity}");
         }
+    }
+
+    private static AuditEnvelope ComplianceSnapshotEnvelope(object command, AuditCommitPhase phase)
+    {
+        ClaimsPrincipal principal = AdminPrincipal("compliance-admin");
+        ChatBotGatewayContext context = new(Submission(principal, command),
+            new ChatBotAuthenticatedActor(ActorId, principal), new ChatBotTenantBinding(BoundTenant));
+        DateTimeOffset now = new FixedClock().UtcNow;
+        LifecycleTransitionDefinition transition = new(LifecycleStates.Received, LifecycleStates.Proposed);
+        return phase == AuditCommitPhase.PreCommit
+            ? AuditEnvelopeFactory.PreCommit(context, transition, now)
+            : AuditEnvelopeFactory.PostCommit(context, new ChatBotDispatchResult(now), transition, now);
     }
 
     [Fact]
