@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Runtime.Serialization;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
@@ -14,7 +17,7 @@ namespace Hexalith.ChatBot.Client.Generated;
 /// enum dictionary names through <see cref="StrictEnumContractResolver"/>. Name matching itself remains
 /// <see cref="Newtonsoft.Json.Converters.StringEnumConverter"/>'s — that
 /// is, case-insensitive and accepting of the CLR member name as well as the declared <c>[EnumMember]</c> wire value.
-/// The strictness claimed here is about integers, not about name casing.
+/// Integer values and compound names on enums without <see cref="FlagsAttribute"/> are refused.
 /// </para>
 /// </summary>
 internal sealed class StrictStringEnumConverter : StringEnumConverter
@@ -43,6 +46,20 @@ internal sealed class StrictStringEnumConverter : StringEnumConverter
             throw new JsonSerializationException("Empty enum wire values are not accepted.");
         }
 
+        Type enumType = Nullable.GetUnderlyingType(objectType) ?? objectType;
+        if (reader.TokenType == JsonToken.String && reader.Value is string name && name.Contains(',') &&
+            !enumType.IsDefined(typeof(FlagsAttribute), inherit: false) &&
+            !IsDeclaredAlias(enumType, name))
+        {
+            throw new JsonSerializationException("Compound names are only accepted on flags enums.");
+        }
+
         return base.ReadJson(reader, objectType, existingValue, serializer);
     }
+
+    private static bool IsDeclaredAlias(Type enumType, string name)
+        => enumType.GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Select(static field => field.GetCustomAttribute<EnumMemberAttribute>()?.Value)
+            .Any(alias => string.Equals(alias, name, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(alias, name.Trim(), StringComparison.OrdinalIgnoreCase));
 }

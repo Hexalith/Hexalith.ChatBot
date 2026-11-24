@@ -52,6 +52,7 @@ public sealed class RecursiveStrictEnumWirePolicyTests
     [InlineData("\"1\"")]
     [InlineData("\"\"")]
     [InlineData("\"unknown\"")]
+    [InlineData("\"Primary, Secondary\"")]
     public void NestedCollectionsRejectPermissiveEnumValues(string token)
     {
         Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<List<List<PermissiveWireEnum?>>>(
@@ -62,6 +63,19 @@ public sealed class RecursiveStrictEnumWirePolicyTests
             $"[{{\"nested\":{token}}}]", Settings));
         Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<Dictionary<PermissiveWireEnum, List<PermissiveWireEnum?>>>(
             $"{{\"primary-state\":[{token}]}}", Settings));
+    }
+
+    [Fact]
+    public void CompoundNamesAreRejectedForNonFlagsScalarsAndKeys()
+    {
+        const string compound = "\"Primary, Secondary\"";
+        Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<PermissiveWireEnum>(compound, Settings));
+        Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<PermissiveWireEnum?>(compound, Settings));
+        Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<Dictionary<PermissiveWireEnum, string>>(
+            """{"Primary, Secondary":"value"}""", Settings));
+
+        JsonConvert.DeserializeObject<FileAccess>("\"Read, Write\"", Settings).ShouldBe(FileAccess.ReadWrite);
+        JsonConvert.DeserializeObject<PermissiveWireEnum>("\" a, b \"", Settings).ShouldBe(PermissiveWireEnum.Aliased);
     }
 
     [Fact]

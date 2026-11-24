@@ -16,4 +16,7 @@ internal enum PermissiveWireEnum
 
     [EnumMember(Value = "secondary-state")]
     Secondary,
+
+    [EnumMember(Value = " a, b ")]
+    Aliased,
 }
