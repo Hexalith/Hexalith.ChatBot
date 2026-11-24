@@ -15,6 +15,9 @@ internal sealed class SafeOutcomeInteractiveRenderer(IServiceProvider services, 
     /// <inheritdoc/>
     public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
 
+    /// <inheritdoc/>
+    protected override RendererInfo RendererInfo { get; } = new("Test", isInteractive: true);
+
     /// <summary>Mounts a root component on the renderer dispatcher.</summary>
     /// <typeparam name="T">The real component to mount.</typeparam>
     /// <param name="parameters">The component parameters.</param>
