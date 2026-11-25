@@ -12,6 +12,8 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Gateway;
 
+using Microsoft.Extensions.DependencyInjection;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
@@ -68,9 +70,8 @@ internal static class RecoveryMailboxOwnerProvisioner
             string actorChatBotToken = await RecoveryAccessTokenProvider.AcquireAsync(application, seed.Token).ConfigureAwait(false);
 
             step = "global-administrator bootstrap";
-            await SubmitOwnerAsync(eventStore, adminToken, "platform:global-administrators", "global-administrators", "global-administrators",
-                "BootstrapGlobalAdmin", new { userId = "admin-user" }, seed.Token,
-                "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
+            await application.Services.GetRequiredService<LiveCatalogFixture>()
+                .WaitForTenantBootstrapAsync(eventStore, adminToken, seed.Token).ConfigureAwait(false);
             step = "global-administrator projection";
             await WaitForGlobalAdministratorAsync(eventStore, adminToken, seed.Token).ConfigureAwait(false);
             step = "tenant creation";

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -10,6 +11,8 @@ using Aspire.Hosting.Testing;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
+using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.IntegrationTests.Recovery;
 using Hexalith.EventStore.Aspire;
 using Hexalith.EventStore.DomainService;
 
@@ -41,8 +44,7 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
     /// <summary>Gets the actual endpoint of this fixture's newly created private Redis backend.</summary>
     public string RedisHost { get; private set; } = string.Empty;
 
-    /// <summary>Gets the Tenants hosted bootstrap receipt path inside this run's private catalog directory.</summary>
-    public string BootstrapReceiptPath =>
+    private string BootstrapReceiptPath =>
         _catalog is null
             ? throw new InvalidOperationException("The live catalog has not been composed.")
             : Path.Combine(_catalog.Directory, "tenants.bootstrap.json");
@@ -113,7 +115,10 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
     }
 
     /// <summary>Enrolls actual compiled owners and exact finite traffic through the public SDK before model construction.</summary>
-    public async Task ConfigureAsync(IDistributedApplicationTestingBuilder builder, CancellationToken cancellationToken)
+    public async Task ConfigureAsync(
+        IDistributedApplicationTestingBuilder builder,
+        CancellationToken cancellationToken,
+        bool enableProjectionWorkers = false)
     {
         ArgumentNullException.ThrowIfNull(builder);
         foreach (ProjectResource project in builder.Resources.OfType<ProjectResource>())
@@ -152,15 +157,18 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
         IResourceBuilder<ProjectResource> Project(string name)
             => builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == name));
         IResourceBuilder<ProjectResource> gateway = Project("eventstore");
-        gateway.WithEnvironment("Authentication__BoundCommand__AllowedDomains__tenants", "global-administrators")
-            .WithEnvironment("EventStore__Projections__WorkersEnabled", "false")
-            .WithEnvironment("EventStore__Projections__DefaultRefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__Projections__Domains__global-administrators__RefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__Projections__Domains__tenants__RefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__Projections__Domains__projects__RefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__Projections__Domains__chatbot__RefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__Projections__Domains__party__RefreshIntervalMs", "0")
-            .WithEnvironment("EventStore__ProjectionDispatch__CatalogRefreshInterval", "01:00:00");
+        gateway.WithEnvironment("Authentication__BoundCommand__AllowedDomains__tenants", "global-administrators");
+        if (!enableProjectionWorkers)
+        {
+            gateway.WithEnvironment("EventStore__Projections__WorkersEnabled", "false")
+                .WithEnvironment("EventStore__Projections__DefaultRefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__Projections__Domains__global-administrators__RefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__Projections__Domains__tenants__RefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__Projections__Domains__projects__RefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__Projections__Domains__chatbot__RefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__Projections__Domains__party__RefreshIntervalMs", "0")
+                .WithEnvironment("EventStore__ProjectionDispatch__CatalogRefreshInterval", "01:00:00");
+        }
         // Catalog composition later sets DOTNET_ENVIRONMENT on every receiver. Capture that value before
         // PrepareEventStoreDevelopmentOwnerAsync so ObserveStarts does not treat the same assignment as drift.
         foreach (string name in new[] { "tenants", "parties", "projects", "chatbot" })
@@ -235,10 +243,117 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
             "chatbot-route-catalog", "catalog-authority", "fixture-v1",
             new Dictionary<string, string> { ["fixture-v1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }, "fixture-v1");
         _catalog = builder.AddEventStoreDevelopmentRouteCatalog(gateway, _owners.Select(owner => owner.Owner).ToArray(), receivers, component, custody);
-        Project("tenants").WithEnvironment(
-            "Tenants__BootstrapBoundWorkloadReceiptPath",
-            Path.Combine(_catalog.Directory, "tenants.bootstrap.json"));
+        tenants.WithEnvironment("Tenants__BootstrapBoundWorkloadReceiptPath", BootstrapReceiptPath);
         builder.Services.AddSingleton<LiveCatalogFixture>(_ => this);
+    }
+
+    /// <summary>Observes the durable bootstrap event through the scoped command-status API.</summary>
+    public async Task WaitForTenantBootstrapAsync(HttpClient gateway, string adminToken, CancellationToken cancellationToken)
+    {
+        TimeSpan timeout = TimeSpan.FromMinutes(2);
+        Stopwatch elapsed = Stopwatch.StartNew();
+        string phase = "missing";
+        int? invokeStatus = null;
+        HttpStatusCode? statusCode = null;
+        while (elapsed.Elapsed < timeout)
+        {
+            if (File.Exists(BootstrapReceiptPath))
+            {
+                using JsonDocument? receipt = await TryReadBootstrapReceiptAsync(cancellationToken).ConfigureAwait(false);
+                if (receipt is null)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                JsonElement root = receipt.RootElement;
+                phase = root.GetProperty("Phase").GetString() ?? "unknown";
+                invokeStatus = root.GetProperty("HttpStatus").ValueKind == JsonValueKind.Number
+                    ? root.GetProperty("HttpStatus").GetInt32() : null;
+                string? messageId = root.GetProperty("MessageId").GetString();
+                string? correlationId = root.GetProperty("CorrelationId").GetString();
+                if (root.GetProperty("RootDigest").GetString() != _catalog!.RootDigest
+                    || root.GetProperty("PrincipalId").GetString() != "admin-user"
+                    || !ChatBotCommandId.TryParse(messageId, out _) || !ChatBotCommandId.TryParse(correlationId, out _))
+                {
+                    throw new InvalidOperationException("The Tenants bootstrap receipt does not match the run-owned catalog and administrator.");
+                }
+
+                using HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/commands/status/{messageId}");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+                request.Headers.Add("X-Hexalith-Scope", "platform:global-administrators");
+                using HttpResponseMessage response = await gateway.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                statusCode = response.StatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    using JsonDocument command = JsonDocument.Parse(
+                        await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false));
+                    string? state = command.RootElement.GetProperty("status").GetString();
+                    if (state == "Completed")
+                    {
+                        if (command.RootElement.GetProperty("correlationId").GetString() != correlationId
+                            || command.RootElement.GetProperty("aggregateId").GetString() != "global-administrators"
+                            || command.RootElement.GetProperty("eventCount").GetInt32() != 1
+                            || command.RootElement.GetProperty("committedEventSequence").GetInt64() != 1)
+                        {
+                            throw new InvalidOperationException("The hosted bootstrap did not commit the initial global administrator event.");
+                        }
+
+                        return;
+                    }
+
+                    bool retryable = command.RootElement.TryGetProperty("retryable", out JsonElement retry)
+                        && retry.ValueKind == JsonValueKind.True;
+                    if (state is "Rejected" or "TimedOut" || state == "PublishFailed" && !retryable)
+                    {
+                        throw new InvalidOperationException($"Tenants bootstrap ended in EventStore state {state}.");
+                    }
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException(
+            $"Tenants bootstrap did not commit within {timeout}. Receipt phase {phase}, invoke HTTP {invokeStatus}, status HTTP {(int?)statusCode}.");
+    }
+
+    private async Task<JsonDocument?> TryReadBootstrapReceiptAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            FileStream stream = new(BootstrapReceiptPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            await using var lifetime = stream.ConfigureAwait(false);
+            return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            // Tenants publishes the attempted receipt before its initial write finishes.
+            return null;
+        }
+    }
+
+    /// <summary>Activates the writer protocol through the catalog-enrolled EventStore admin endpoint.</summary>
+    public async Task ActivateWriterProtocolAsync(DistributedApplication application, CancellationToken cancellationToken)
+    {
+        string directory = _catalog?.Directory ?? throw new InvalidOperationException("The live catalog has not been composed.");
+        string committed = Path.Combine(directory, "eventstore.committed.json");
+        TimeSpan timeout = TimeSpan.FromMinutes(3);
+        Stopwatch elapsed = Stopwatch.StartNew();
+        // EventStore writes this receipt after reading its committed authority. The admin request then
+        // independently exercises that authority and the authenticated projection cutover endpoint.
+        while (!File.Exists(committed))
+        {
+            if (elapsed.Elapsed >= timeout)
+            {
+                throw new TimeoutException($"EventStore did not observe a committed owner catalog within {timeout}.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+        }
+
+        await RecoveryWriterProtocolProvisioner.ActivateAsync(
+            application, RecoveryRepositoryCommitResolver.Resolve(), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Applies the fixture's mTLS and isolated discovery settings to a sidecar configuration.</summary>

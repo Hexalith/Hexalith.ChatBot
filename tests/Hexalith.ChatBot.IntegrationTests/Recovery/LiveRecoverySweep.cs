@@ -95,9 +95,16 @@ internal sealed class LiveRecoverySweep
         }
 
         Directory.CreateDirectory(markerRoot);
+        LiveCatalogFixture catalog = await LiveCatalogFixture.CreateAsync(cancellationToken).ConfigureAwait(true);
+        await using ConfiguredAsyncDisposable catalogScope = catalog.ConfigureAwait(true);
         using PortReservationSet internalGrpcReservations = PortReservationSet.Reserve(DaprInternalGrpcAppIds.Length);
         List<string> arguments =
         [
+            "--environment=Development",
+            "--EnableKeycloak=true",
+            "--KeycloakPersistent=false",
+            "--DevelopmentRouteCatalog:PrepareOwners=true",
+            $"--Dapr:RedisHost={catalog.RedisHost}",
             "--LiveRecoveryValidation:Enabled=true",
             "--LiveRecoveryValidation:EnvironmentName=Testing",
             $"--LiveRecoveryValidation:TestTenantRef={tenantRef}",
@@ -124,6 +131,7 @@ internal sealed class LiveRecoverySweep
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
             .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(arguments.ToArray(), cancellationToken)
             .ConfigureAwait(true);
+        await using ConfiguredAsyncDisposable builderScope = builder.ConfigureAwait(true);
         // The canonical projects declare fixed launch-profile HTTP ports. A concurrently running Aspire app can
         // already own one (notably EventStore's :8080), so this validation topology must bind its own listeners.
         // Hold the reservations through model construction, then release them immediately before startup.
@@ -163,6 +171,7 @@ internal sealed class LiveRecoverySweep
             context.EnvironmentVariables["ChatBot__Projection__Topic"] = $"{RecoveryValidationTopology.StorageTenantRef}.chatbot.events";
             context.EnvironmentVariables["ChatBot__Projection__DeadLetterTopic"] = $"deadletter.{RecoveryValidationTopology.StorageTenantRef}.chatbot.events";
         }));
+        await catalog.ConfigureAsync(builder, cancellationToken, enableProjectionWorkers: true).ConfigureAwait(true);
 
         DistributedApplication application = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
         IReadOnlyList<string>? rebuildFreshKeys = null;
@@ -201,12 +210,8 @@ internal sealed class LiveRecoverySweep
                 chatBotLogTail.Render(),
                 eventStoreLogTail.Render());
 
-            // Before the readiness waits, because readiness depends on it: a fresh store reports EventStore
-            // Unhealthy until the store-global writer protocol is activated, so waiting for health first would
-            // deadlock. Driven through the same admin endpoint a real deployment uses.
-            await RecoveryWriterProtocolProvisioner
-                .ActivateAsync(application, RecoveryRepositoryCommitResolver.Resolve(), startup.Token)
-                .ConfigureAwait(true);
+            // A fresh store reports EventStore Unhealthy until the writer protocol is activated.
+            await catalog.ActivateWriterProtocolAsync(application, startup.Token).ConfigureAwait(true);
 
             foreach (string resource in new[] { "security", "eventstore", "chatbot", "recovery-sandbox" })
             {

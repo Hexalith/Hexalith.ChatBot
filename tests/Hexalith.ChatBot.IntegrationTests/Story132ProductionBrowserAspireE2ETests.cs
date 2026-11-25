@@ -119,9 +119,6 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             using HttpClient tenants = app.CreateHttpClient("tenants", "http");
             tenants.Timeout = TimeSpan.FromSeconds(15);
             await TrivialGovernedCommandAspireE2eTests.WaitForListenerAsync(eventStore, cancellationToken).ConfigureAwait(true);
-            await RecoveryWriterProtocolProvisioner
-                .ActivateAsync(app, RecoveryRepositoryCommitResolver.Resolve(), cancellationToken)
-                .ConfigureAwait(true);
             await TrivialGovernedCommandAspireE2eTests.WaitForReadyAsync(eventStore, "EventStore", cancellationToken).ConfigureAwait(true);
             await TrivialGovernedCommandAspireE2eTests.WaitForListenerAsync(tenants, cancellationToken).ConfigureAwait(true);
             await TrivialGovernedCommandAspireE2eTests.WaitForChatBotListeningAsync(chatBot, cancellationToken).ConfigureAwait(true);
