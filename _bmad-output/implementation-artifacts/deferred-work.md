@@ -1307,6 +1307,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Reconcile known terminal failure codes with independently stored resolved statuses in failure conversation items.
   evidence: D-B3; the baseline already rendered Item.FailureStatus beside terminal_failure catalog copy. Define producer state/code compatibility before changing history rendering.
+  resolution: Resolved 2026-11-25. Terminal events suppress contradictory resolution and retry metadata, including independently supplied summary facets. Four render cases cover terminal failure, exhausted retry and genuine reprocess history.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Give distinct association-review attempts or route identities distinct announcement keys for repeated same-code failures.

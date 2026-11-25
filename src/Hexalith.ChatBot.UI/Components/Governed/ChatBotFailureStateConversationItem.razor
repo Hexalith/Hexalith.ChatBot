@@ -35,10 +35,13 @@
                     @FormatDisplayUtc(Item.OccurredAt)
                 </time>
             </FluentStack>
-    @if (!IsGenericDenial)
+    @{
+        ProjectConversationItemStatusSummaryModel? summary = ResolvedStatusSummary;
+    }
+    @if (!IsGenericDenial && (!IsTerminalFailure || summary?.Facets.Count > 0))
     {
-    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
-                                          Summary="@Item.StatusSummary" />
+        <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                               Summary="@summary" />
     }
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
@@ -61,14 +64,14 @@
         @MetadataRow(ChatBotUiTextKey.FailureRetryOperationLabel, IsGenericDenial ? null : Item.RetryOperationId)
         @MetadataRow(ChatBotUiTextKey.FailureRetryableLabel, RetryableText)
         @MetadataRow(ChatBotUiTextKey.FailureRetryCountLabel, RetryCountText)
-        @TimestampRow(ChatBotUiTextKey.FailureNextRetryAtLabel, IsGenericDenial ? null : Item.NextRetryAtUtc)
+        @TimestampRow(ChatBotUiTextKey.FailureNextRetryAtLabel, IsGenericDenial || IsTerminalFailure ? null : Item.NextRetryAtUtc)
         @TimestampRow(ChatBotUiTextKey.FailureLastRetryAtLabel, IsGenericDenial ? null : Item.LastRetryAtUtc)
         @MetadataRow(ChatBotUiTextKey.FailureDuplicateSafetyLabel, Item.DuplicateSafetyState)
         @MetadataRow(ChatBotUiTextKey.FailureDuplicateSuppressionLabel, Item.DuplicateSuppressionId)
         @MetadataRow(ChatBotUiTextKey.FailureDependencyNameLabel, Item.DependencyName)
         @TimestampRow(ChatBotUiTextKey.FailureDegradedUntilLabel, Item.DegradedUntilUtc)
         @MetadataRow(ChatBotUiTextKey.FailureEscalationTargetLabel, Item.EscalationTargetRole)
-        @MetadataRow(ChatBotUiTextKey.FailureReprocessWorkflowLabel, Item.ReprocessCreatedWorkflowInstanceId)
+        @MetadataRow(ChatBotUiTextKey.FailureReprocessWorkflowLabel, HasContradictoryResolution ? null : Item.ReprocessCreatedWorkflowInstanceId)
         @MetadataRow(ChatBotUiTextKey.FailureAuditOperationLabel, DisplayAuditOperationId)
         @MetadataRow(ChatBotUiTextKey.FailureAuditStatusLabel, Item.AuditStatus)
         @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
@@ -136,9 +139,37 @@
 
     private bool IsGenericDenial => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial;
 
-    private string? ResolvedFailureStatus => IsGenericDenial ? "terminal" : Item.FailureStatus;
+    private bool IsTerminalFailure
+        => CatalogEntry is { IsTerminal: true, State: "failed" } || CatalogEntry.Code == ChatBotMessageCodes.RetryExhausted;
 
-    private string? ResolvedFailureStateKind => IsGenericDenial ? "terminal-failure" : Item.FailureStateKind;
+    private bool HasContradictoryResolution
+        => IsTerminalFailure && (IsResolved(Item.FailureStatus) || IsResolved(Item.FailureStateKind));
+
+    private ProjectConversationItemStatusSummaryModel? ResolvedStatusSummary
+    {
+        get
+        {
+            if (IsGenericDenial || Item.StatusSummary is not { } summary)
+            {
+                return null;
+            }
+
+            return IsTerminalFailure ? summary with
+            {
+                Facets = summary.Facets.Where(static facet => facet.Domain != "failure"
+                    || !(IsResolved(facet.SourceState) || facet.Health == "healthy" || facet.CompletionStatus == "completed")).ToArray(),
+            } : summary;
+        }
+    }
+
+    private static bool IsResolved(string? status)
+        => string.Equals(status, "resolved", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "reprocess-created", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "ReprocessCreated", StringComparison.OrdinalIgnoreCase);
+
+    private string? ResolvedFailureStatus => IsGenericDenial || HasContradictoryResolution ? "terminal" : Item.FailureStatus;
+
+    private string? ResolvedFailureStateKind => IsGenericDenial || HasContradictoryResolution ? "terminal-failure" : Item.FailureStateKind;
 
     private bool _announce;
     private bool _hasAnnounced;

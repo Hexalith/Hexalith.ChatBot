@@ -731,6 +731,43 @@ public sealed class VersionedSafeOutcomeRenderTests
         }
     }
 
+    /// <summary>Renders a resolution only when the outcome represents a resolution event.</summary>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.TerminalFailure, "resolved", false)]
+    [InlineData(ChatBotMessageCodes.TerminalFailure, "terminal", false)]
+    [InlineData(ChatBotMessageCodes.RetryExhausted, "resolved", false)]
+    [InlineData(ChatBotMessageCodes.ReprocessCreated, "resolved", true)]
+    public async Task FailureStatusShouldAgreeWithTheCatalogOutcome(string code, string storedStatus, bool resolved)
+    {
+        ProjectConversationItemModel item = CreateFailureItem(code, "resolution") with
+        {
+            FailureStatus = storedStatus,
+            FailureStateKind = storedStatus == "resolved" ? "reprocess-created" : "terminal-failure",
+            NextRetryAtUtc = DateTimeOffset.Parse("2031-01-01T00:00:00Z", CultureInfo.InvariantCulture),
+            StatusSummary = new([new("failure", "healthy", "resolved", "command_accepted", "none",
+                new Dictionary<string, string>(), false, null, "completed", null, null, null, null, null, null, null)]),
+        };
+        string html = await RenderParentAsync<ChatBotFailureStateConversationItem>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotFailureStateConversationItem.Item)] = item,
+        });
+        string text = WebUtility.HtmlDecode(html);
+
+        if (resolved)
+        {
+            text.ShouldContain("Resolved");
+            html.ShouldContain("chatbot-conversation-status-summary");
+        }
+        else
+        {
+            text.ShouldContain("Terminal");
+            text.ShouldNotContain("Resolved");
+            text.ShouldNotContain("Reprocess created");
+            html.ShouldNotContain("chatbot-conversation-status-summary");
+            html.ShouldNotContain("2031-");
+        }
+    }
+
     /// <summary>Blocked surfaces cannot describe an incompatible acceptance as the current outcome.</summary>
     /// <param name="code">The incompatible acceptance code.</param>
     [Theory]
