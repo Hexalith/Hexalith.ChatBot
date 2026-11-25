@@ -62,6 +62,7 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
         try
         {
             _ = await RunAsync(["run", "--detach", "--name", fixture._containerName,
+                "--label", "io.hexalith.chatbot-live.role=fixture-redis",
                 "--label", "io.hexalith.chatbot-live.run=" + fixture._runId,
                 "--label", "io.hexalith.chatbot-live.scope=" + Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar),
                 "--label", "io.hexalith.chatbot-live.custody=" + fixture._directory,

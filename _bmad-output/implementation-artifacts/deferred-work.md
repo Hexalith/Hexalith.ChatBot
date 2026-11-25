@@ -2254,6 +2254,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Live catalog Redis containers can leak when the recovery timeout SIGKILLs the process.
   evidence: `LiveCatalogFixture` starts `redis:7.4.2` and cleans up only in `DisposeAsync`. Live topology, not this story.
+  resolution: Resolved 2026-11-25. The nightly hook gives its producer a private temp scope and reaps only matching fixture-Redis containers after it exits. The hook preserves producer status and records cleanup status. In a real Docker probe after SIGKILL, Redis was removed and both a same-scope non-Redis container and another run’s Redis remained running.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: The recovery-validator sandbox user still carries a static password and bootstrap admin grants.
