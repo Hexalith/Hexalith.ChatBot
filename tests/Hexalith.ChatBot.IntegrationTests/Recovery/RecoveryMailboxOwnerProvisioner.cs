@@ -89,32 +89,40 @@ internal static class RecoveryMailboxOwnerProvisioner
                 seed.Token).ConfigureAwait(false);
 
             step = "mailbox operation grant";
-            string operationKey = ChatBotAuthorityGrantKey.For(Tenant, RecoveryValidationTopology.MailboxClientId,
-                ProbeIntakeId, ProbeOperation, "operation", "service", ChatBotSurfaceOrigin.Mailbox);
-            var operationGrant = new GrantChatBotAuthority(operationKey, ChatBotCommandId.New().ToString(),
-                RecoveryValidationTopology.MailboxClientId, ProbeIntakeId, ProbeOperation, "operation", "service",
-                ChatBotSurfaceOrigin.Mailbox, DateTimeOffset.UtcNow.AddHours(1));
+            (GrantChatBotAuthority operationGrant, GrantChatBotAuthority serviceGrant) = CreateGrants(DateTimeOffset.UtcNow);
             await SubmitChatBotGrantAsync(chatBot, actorChatBotToken, eventStore, actorEventStoreToken,
                 operationGrant, seed.Token).ConfigureAwait(false);
 
             step = "mailbox service grant";
-            string serviceGrantId = ChatBotCommandId.New().ToString();
-            DateTimeOffset serviceGrantExpiresAt = DateTimeOffset.UtcNow.Add(ServiceGrantLease);
-            var serviceGrant = new ServiceClientGrant(serviceGrantId, Tenant, RecoveryValidationTopology.MailboxClientId,
-                ServiceClientClass.MailboxIngestion, [ProbeOperation], [], ChatBotSurfaceOrigin.Mailbox, serviceGrantExpiresAt, false,
-                ["mailbox.ingest"], "command-set-v1");
-            string serviceKey = ChatBotAuthorityGrantKey.For(Tenant, RecoveryValidationTopology.MailboxClientId,
-                RecoveryValidationTopology.MailboxClientId, ProbeOperation, "service-grant", "service", ChatBotSurfaceOrigin.Mailbox);
-            var serviceAuthority = new GrantChatBotAuthority(serviceKey, serviceGrantId,
-                RecoveryValidationTopology.MailboxClientId, RecoveryValidationTopology.MailboxClientId,
-                ProbeOperation, "service-grant", "service", ChatBotSurfaceOrigin.Mailbox, serviceGrantExpiresAt, serviceGrant);
             await SubmitChatBotGrantAsync(chatBot, actorChatBotToken, eventStore, actorEventStoreToken,
-                serviceAuthority, seed.Token).ConfigureAwait(false);
+                serviceGrant, seed.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (seed.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException($"Recovery mailbox owner seeding exceeded its {SeedBudget} budget during the {step} step.");
         }
+    }
+
+    /// <summary>Builds the two owner grants used by the live mailbox admission probe.</summary>
+    /// <param name="issuedAtUtc">The issuance time used to bound both grants.</param>
+    /// <returns>The exact operation and service-client authority commands.</returns>
+    internal static (GrantChatBotAuthority Operation, GrantChatBotAuthority Service) CreateGrants(DateTimeOffset issuedAtUtc)
+    {
+        const string client = RecoveryValidationTopology.MailboxClientId;
+        string operationKey = ChatBotAuthorityGrantKey.For(Tenant, client, ProbeIntakeId,
+            ProbeOperation, "operation", "service", ChatBotSurfaceOrigin.Mailbox);
+        var operation = new GrantChatBotAuthority(operationKey, ChatBotCommandId.New().ToString(),
+            client, ProbeIntakeId, ProbeOperation, "operation", "service", ChatBotSurfaceOrigin.Mailbox, issuedAtUtc.AddHours(1));
+
+        string serviceGrantId = ChatBotCommandId.New().ToString();
+        DateTimeOffset serviceGrantExpiresAt = issuedAtUtc.Add(ServiceGrantLease);
+        var serviceGrant = new ServiceClientGrant(serviceGrantId, Tenant, client, ServiceClientClass.MailboxIngestion,
+            [ProbeOperation], [], ChatBotSurfaceOrigin.Mailbox, serviceGrantExpiresAt, false, ["mailbox.ingest"], "command-set-v1");
+        string serviceKey = ChatBotAuthorityGrantKey.For(Tenant, client, client,
+            ProbeOperation, "service-grant", "service", ChatBotSurfaceOrigin.Mailbox);
+        var service = new GrantChatBotAuthority(serviceKey, serviceGrantId, client, client,
+            ProbeOperation, "service-grant", "service", ChatBotSurfaceOrigin.Mailbox, serviceGrantExpiresAt, serviceGrant);
+        return (operation, service);
     }
 
     /// <summary>

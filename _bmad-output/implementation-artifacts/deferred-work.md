@@ -2022,6 +2022,7 @@ archived: 2026-11-24
   evidence: `tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs` is referenced only by `LiveContinuityAspireE2eTests.cs:215`, which runs only in the gated live recovery lanes.
   reason: The test only means something once a seeding route exists. The production gateway refuses every grant while A6/A13 are open (R17-D1).
   closure: A contract test proves that the built grants pass `GovernedOperationAggregate.Handle(GrantChatBotAuthority)` validation.
+  resolution: Resolved 2026-11-25. The ordinary integration lane builds the exact live probe grants and verifies their bounded scope and acceptance by the ChatBot authority aggregate.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: R17-W2 — The drill's own mailbox intakes have no per-intake ChatBot operation authority (pre-existing).
   evidence: `src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxIntakeWorker.cs:176` mints `MailboxMessageIntakeId.New()`. The authorizer requires ChatBot `operation` evidence on each `IntakeId` (`ChatBotAuthorityCatalog.cs:26`). The seed covers only the probe intake.
