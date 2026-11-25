@@ -2341,6 +2341,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: A decision or correction failure that completes after the reviewer moved to another association may still be applied, announced and focused on the new association's page.
   evidence: Maybe-false, medium if true. `AssociationReviewReducers.ReduceSubmitFailed` and `ReduceCorrectionFailed` do not compare the originating association, and the 2026-11-24 activation counter now makes such a failure announce. Settle with a reducer test that dispatches a stale failure after navigation.
+  resolution: Resolved 2026-11-25. Decision and correction results carry the exact originating load. The active review discards stale success, failure and validation results after navigation, including a return to the original ID. The effects and reducer suites passed all 97 cases. The 16-case review run also checks that both current validation rejections still apply inline.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: Returning to the association review page with an already-announced failure moves focus to the error summary again, although the banner stays silent.

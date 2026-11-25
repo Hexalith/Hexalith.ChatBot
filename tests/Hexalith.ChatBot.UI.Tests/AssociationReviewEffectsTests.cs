@@ -305,6 +305,108 @@ public sealed class AssociationReviewEffectsTests
         }
     }
 
+    /// <summary>Only the load that started a submission can apply its eventual outcome.</summary>
+    [Theory]
+    [InlineData(false, "accepted", "current")]
+    [InlineData(false, "failed", "current")]
+    [InlineData(false, "validation", "current")]
+    [InlineData(false, "accepted", "away")]
+    [InlineData(false, "failed", "away")]
+    [InlineData(false, "accepted", "returned")]
+    [InlineData(false, "failed", "returned")]
+    [InlineData(false, "validation", "returned")]
+    [InlineData(true, "accepted", "current")]
+    [InlineData(true, "failed", "current")]
+    [InlineData(true, "validation", "current")]
+    [InlineData(true, "accepted", "away")]
+    [InlineData(true, "failed", "away")]
+    [InlineData(true, "accepted", "returned")]
+    [InlineData(true, "failed", "returned")]
+    [InlineData(true, "validation", "returned")]
+    public async Task SubmissionResultCanOnlyChangeTheReviewThatStartedIt(bool correction, string outcome, string destination)
+    {
+        RecordingClient client = new() { LifecycleState = correction ? LifecycleState.Associated : LifecycleState.NeedsReview };
+        AssociationReviewState initial = StateOf(client, pendingDecisionCode: correction ? null : "choose-candidate");
+        AssociationReviewModel originalReview = initial.Review.ShouldNotBeNull();
+        var originalLoad = new LoadAssociationReviewAction(originalReview.AssociationId);
+        FakeState state = new(initial with { CurrentLoad = originalLoad, IsSubmitting = true });
+        AssociationReviewEffects effects = new(new AssociationReviewService(client, AssociationReviewTestText.Create()), state);
+        RecordingDispatcher dispatcher = new();
+        TaskCompletionSource<CommandSubmissionResponse> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.PendingSubmit = pending;
+
+        Task submit = correction
+            ? effects.HandleCorrectionAsync(new SubmitAssociationCorrectionAction(), dispatcher)
+            : effects.HandleConfirmedDecisionAsync(new ConfirmAssociationDecisionAction(), dispatcher);
+        client.SubmitCount.ShouldBe(1);
+        submit.IsCompleted.ShouldBeFalse();
+
+        void NavigateTo(AssociationReviewModel review)
+        {
+            LoadAssociationReviewAction load = new(review.AssociationId);
+            state.Value = AssociationReviewReducers.ReduceLoad(state.Value, load);
+            state.Value.IsSubmitting.ShouldBeFalse();
+            state.Value = AssociationReviewReducers.ReduceLoaded(state.Value, new(review) { OriginatingLoad = load });
+        }
+
+        if (destination != "current")
+        {
+            NavigateTo(originalReview with { AssociationId = "different-association" });
+            if (destination == "returned")
+            {
+                NavigateTo(originalReview with { SourceVersion = originalReview.SourceVersion + 1 });
+            }
+        }
+
+        AssociationReviewState current = state.Value;
+        if (outcome == "accepted")
+        {
+            pending.SetResult(client.SubmitResponse());
+        }
+        else
+        {
+            pending.SetException(outcome == "validation"
+                ? new InvalidOperationException("stale-evidence")
+                : new TimeoutException("delayed submission failure"));
+        }
+
+        await submit.ConfigureAwait(true);
+        AssociationReviewState updated = dispatcher.Actions.ShouldHaveSingleItem() switch
+        {
+            AssociationDecisionSubmittedAction action => AssociationReviewReducers.ReduceSubmitted(current, action),
+            AssociationDecisionSubmitFailedAction action => AssociationReviewReducers.ReduceSubmitFailed(current, action),
+            AssociationDecisionValidationRejectedAction action => AssociationReviewReducers.ReduceDecisionRejected(current, action),
+            AssociationCorrectionSubmittedAction action => AssociationReviewReducers.ReduceCorrectionSubmitted(current, action),
+            AssociationCorrectionSubmitFailedAction action => AssociationReviewReducers.ReduceCorrectionFailed(current, action),
+            AssociationCorrectionValidationRejectedAction action => AssociationReviewReducers.ReduceCorrectionRejected(current, action),
+            _ => throw new InvalidOperationException("Unexpected submission result."),
+        };
+
+        if (destination != "current")
+        {
+            updated.ShouldBeSameAs(current);
+        }
+        else if (outcome == "accepted")
+        {
+            updated.IsSubmitting.ShouldBeFalse();
+            updated.LastAcceptedOperation.ShouldNotBeNull().CommandId.ShouldBe(client.SubmitResponse().CommandId);
+        }
+        else if (outcome == "validation")
+        {
+            updated.IsSubmitting.ShouldBeFalse();
+            updated.ValidationErrorCode.ShouldBe("stale-evidence");
+            updated.ErrorCode.ShouldBeNull();
+            updated.FailureActivation.ShouldBe(current.FailureActivation);
+            updated.Review.ShouldBeSameAs(originalReview);
+        }
+        else
+        {
+            updated.IsSubmitting.ShouldBeFalse();
+            updated.ErrorScope.ShouldBe(AssociationReviewErrorScope.Submit);
+            updated.FailureActivation.ShouldBe(current.FailureActivation + 1);
+        }
+    }
+
     [Fact]
     public async Task CorrectionEffectShouldRequireATarget()
     {
@@ -440,6 +542,8 @@ public sealed class AssociationReviewEffectsTests
 
         public TaskCompletionSource<AssociationRoutingStatus>? PendingRoutingRead { get; set; }
 
+        public TaskCompletionSource<CommandSubmissionResponse>? PendingSubmit { get; set; }
+
         public IChatBotCommand? SubmittedCommand { get; private set; }
 
         public void ResetCounters() => SubmitCount = 0;
@@ -454,14 +558,17 @@ public sealed class AssociationReviewEffectsTests
             SubmitCount++;
             if (SubmitException is not null) throw SubmitException;
             SubmittedCommand = command;
-            return Task.FromResult(new CommandSubmissionResponse
+            return PendingSubmit?.Task ?? Task.FromResult(SubmitResponse());
+        }
+
+        public CommandSubmissionResponse SubmitResponse()
+            => new()
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAC",
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                 TaskId = null,
                 LifecycleState = LifecycleState,
-            });
-        }
+            };
 
         public Task<OperationStatus> GetOperationStatusAsync(
             string operationId,

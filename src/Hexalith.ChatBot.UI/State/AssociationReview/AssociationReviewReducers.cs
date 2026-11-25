@@ -18,6 +18,7 @@ public static class AssociationReviewReducers
         return state with
         {
             IsLoading = true,
+            IsSubmitting = false,
             CurrentLoad = action,
             Review = sameAssociation ? state.Review : null,
             SelectedCandidateId = sameAssociation ? state.SelectedCandidateId : null,
@@ -125,6 +126,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
@@ -164,6 +170,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
@@ -190,6 +201,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
@@ -205,6 +221,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with { IsSubmitting = false, ValidationErrorCode = action.ValidationErrorCode };
     }
 
@@ -213,6 +234,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
@@ -235,6 +261,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,

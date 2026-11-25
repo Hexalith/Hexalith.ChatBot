@@ -89,7 +89,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         AssociationReviewState current = _state.Value;
         if (current.Review is null || current.PendingDecisionCode is not { Length: > 0 } decisionCode)
         {
-            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(GenericFailureCode));
+            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(GenericFailureCode) { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
@@ -97,7 +97,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         // state between the render that enabled the action and the confirmation.
         if (current.Review.IsTerminal)
         {
-            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction("terminal-state"));
+            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction("terminal-state") { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
@@ -109,7 +109,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                 current.Review.DisabledActionReasonCodes) is { Length: > 0 } blocked)
         {
             dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(
-                IsSafeValidationCode(blocked) ? blocked : GenericFailureCode));
+                IsSafeValidationCode(blocked) ? blocked : GenericFailureCode) { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
@@ -122,7 +122,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                     current.SelectedCandidateId,
                     current.DecisionNote)
                 .ConfigureAwait(false);
-            dispatcher.Dispatch(new AssociationDecisionSubmittedAction(result));
+            dispatcher.Dispatch(new AssociationDecisionSubmittedAction(result) { OriginatingLoad = current.CurrentLoad });
         }
         catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
@@ -130,15 +130,15 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))) { OriginatingLoad = current.CurrentLoad });
         }
         catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
         {
-            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(invalid.Message));
+            dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(invalid.Message) { OriginatingLoad = current.CurrentLoad });
         }
         catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)) { OriginatingLoad = current.CurrentLoad });
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         AssociationReviewState current = _state.Value;
         if (current.Review is null)
         {
-            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(GenericFailureCode));
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(GenericFailureCode) { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
@@ -159,13 +159,13 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         // mirrors it exactly so the panel is never rendered with a submit that can only fail.
         if (!AssociationReviewModelExtensions.CanCorrect(current.Review.LifecycleState))
         {
-            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-invalid-lifecycle"));
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-invalid-lifecycle") { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
         if (current.SelectedCandidate is null)
         {
-            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-target-required"));
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-target-required") { OriginatingLoad = current.CurrentLoad });
             return;
         }
 
@@ -177,7 +177,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                     current.SelectedCandidate.ProjectId,
                     current.CorrectionRationale)
                 .ConfigureAwait(false);
-            dispatcher.Dispatch(new AssociationCorrectionSubmittedAction(result));
+            dispatcher.Dispatch(new AssociationCorrectionSubmittedAction(result) { OriginatingLoad = current.CurrentLoad });
         }
         catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
@@ -185,15 +185,15 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))) { OriginatingLoad = current.CurrentLoad });
         }
         catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
         {
-            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(invalid.Message));
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(invalid.Message) { OriginatingLoad = current.CurrentLoad });
         }
         catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)) { OriginatingLoad = current.CurrentLoad });
         }
     }
 
