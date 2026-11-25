@@ -2243,6 +2243,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: ChatBot silences Aspire 17 `AddProject` deprecations for every project.
   evidence: `Directory.Build.props:29` adds `CS0618` and `ASPIRE012` to `WarningsNotAsErrors`. .NET 11/Aspire 17 follow-on, not package-mode pairing.
+  resolution: Resolved 2026-11-25. Removed the repo-wide CS0618 and ASPIRE012 exceptions. The retained recovery topology call has a local diagnostic suppression for its legacy resource type.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Release dispatch can bypass stop-ship gates and still mint a nuget.org credential.

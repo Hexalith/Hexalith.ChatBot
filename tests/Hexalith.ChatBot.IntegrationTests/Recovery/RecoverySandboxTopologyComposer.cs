@@ -52,9 +52,10 @@ internal static class RecoverySandboxTopologyComposer
             .Select(builder.CreateResourceBuilder)
             .Single();
         string projectPath = ResolveProjectPath(builder.AppHostDirectory);
-        return builder
-            .AddProject("recovery-sandbox", projectPath)
-            .WithReference(chatBot)
+#pragma warning disable CS0618 // This test composes the legacy ProjectResource used by the Dapr sidecar.
+        IResourceBuilder<ProjectResource> sandbox = builder.AddProject("recovery-sandbox", projectPath);
+#pragma warning restore CS0618
+        return sandbox.WithReference(chatBot)
             .WaitFor(chatBot)
             .WithEnvironment("Recovery__Enabled", "true")
             .WithEnvironment("Recovery__TenantRef", tenantRef)
