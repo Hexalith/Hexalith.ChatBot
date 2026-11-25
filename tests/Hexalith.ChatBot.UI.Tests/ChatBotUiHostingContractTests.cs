@@ -19,12 +19,14 @@ public sealed class ChatBotUiHostingContractTests
         defaults.ShouldContain("resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60)");
         defaults.ShouldContain("resilience.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60)");
         defaults.ShouldContain("AddOpenTelemetry");
-        defaults.ShouldContain("UseOtlpExporter");
+        defaults.ShouldContain("ConfigureOpenTelemetry");
+        defaults.ShouldContain("ChatBotMessageCatalog.FallbackMeterName");
         defaults.ShouldContain("MapGet(\"/health\"");
         defaults.ShouldContain("MapGet(\"/alive\"");
         project.ShouldContain("Microsoft.Extensions.Http.Resilience");
         project.ShouldContain("Microsoft.Extensions.ServiceDiscovery");
         project.ShouldContain("OpenTelemetry.Extensions.Hosting");
+        project.ShouldContain("Hexalith.EventStore.ServiceDefaults");
         project.ShouldNotContain("Hexalith.ChatBot.ServiceDefaults");
     }
 }

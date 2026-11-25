@@ -725,7 +725,8 @@ origin: migrated from legacy ledger ("Deferred from: hosted-lane review of 12-15
 location: ChatBotUiHostDefaultsExtensions.cs:34-37
 severity: medium
 reason: **[MEDIUM · reliability] The ChatBot UI host can still be made unstoppable by an unreachable OTLP collector.** `ChatBotUiHostDefaultsExtensions.cs:34-37` registers `UseOtlpExporter()` with no bounded telemetry shutdown, and `chatbot-ui` is a composed resource in the same DCP application as the EventStore host that was fixed. Provider disposal joins the batch-exporter thread with no timeout while that thread is parked in the exporter's retry sleep, so `IHost.DisposeAsync` never returns and the resource cannot be stopped. **Constraint:** the fix that exists, `BoundedTelemetryShutdownService`, is `internal sealed` to `Hexalith.EventStore.ServiceDefaults`, so the UI host cannot adopt it without a visibility change in that repository — which is why this is recorded rather than copied. **Owner:** ChatBot UI hosting, with EventStore ServiceDefaults for the visibility decision. **Closure evidence:** the UI host stops cleanly with an unreachable OTLP endpoint, proven the same falsifiable way as the EventStore host (disable the bound, the dispose test fails).
-status: open
+status: done 2026-11-25
+resolution: The UI uses EventStore ServiceDefaults for telemetry and retains its catalog meter. The host lifecycle test stops and disposes the DI host while an exporter is blocked.
 triage: 2026-11-24 Skipped. The bounded shutdown implementation remains internal to EventStore. The supported reusable platform API is required.
 decision: 2026-08-27 Expose platform API — Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.
 decision: 2026-08-26 Expose platform API — Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.

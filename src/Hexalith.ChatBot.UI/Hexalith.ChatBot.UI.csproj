@@ -10,10 +10,11 @@
     <InternalsVisibleTo Include="Hexalith.ChatBot.UI.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Surface adapter: depends only on the typed Client facade and FrontComposer Shell (no Server). -->
+    <!-- Surface adapter: depends only on the typed Client facade, FrontComposer Shell and shared telemetry defaults. -->
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.ServiceDefaults\Hexalith.EventStore.ServiceDefaults.csproj" />
     <ProjectReference Include="$(HexalithFrontComposerRoot)\src\Hexalith.FrontComposer.Shell\Hexalith.FrontComposer.Shell.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -28,13 +29,10 @@
          protocol package brings its mutually versioned token/JWT dependencies with it. -->
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="OpenTelemetry" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.EventStore.ServiceDefaults" />
     <PackageReference Include="Hexalith.FrontComposer.Shell" />
   </ItemGroup>
 </Project>

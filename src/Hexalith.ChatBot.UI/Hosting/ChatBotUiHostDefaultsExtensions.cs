@@ -1,16 +1,14 @@
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.EventStore.ServiceDefaults;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
-using Microsoft.Extensions.Logging;
 
 using OpenTelemetry;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 
 namespace Hexalith.ChatBot.UI.Hosting;
 
@@ -20,26 +18,9 @@ internal static class ChatBotUiHostDefaultsExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        _ = builder.Logging.AddOpenTelemetry(logging =>
-        {
-            logging.IncludeFormattedMessage = true;
-            logging.IncludeScopes = true;
-        });
-
+        _ = builder.ConfigureOpenTelemetry();
         _ = builder.Services.AddOpenTelemetry()
-            .WithMetrics(metrics => _ = metrics
-                .AddMeter(ChatBotMessageCatalog.FallbackMeterName)
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddRuntimeInstrumentation())
-            .WithTracing(tracing => _ = tracing
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation());
-
-        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
-        {
-            _ = builder.Services.AddOpenTelemetry().UseOtlpExporter();
-        }
+            .WithMetrics(static metrics => metrics.AddMeter(ChatBotMessageCatalog.FallbackMeterName));
 
         _ = builder.Services.AddServiceDiscovery();
         _ = builder.Services.ConfigureHttpClientDefaults(static http =>

@@ -344,11 +344,11 @@ public static class ScaffoldArchitectureTests
         const string UiProject = "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj";
         string[] references = ProjectReferences(UiProject);
 
-        // The UI is a surface adapter: it depends only on the typed Client facade and the framework-owned
-        // FrontComposer Shell composition layer.
+        // The UI uses the typed Client facade, FrontComposer Shell and the platform's host telemetry setup.
         references.ShouldBe(
             [
                 "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
+                "$(HexalithEventStoreRoot)\\src\\Hexalith.EventStore.ServiceDefaults\\Hexalith.EventStore.ServiceDefaults.csproj",
                 "$(HexalithFrontComposerRoot)\\src\\Hexalith.FrontComposer.Shell\\Hexalith.FrontComposer.Shell.csproj",
             ],
             ignoreOrder: true);
@@ -380,7 +380,9 @@ public static class ScaffoldArchitectureTests
             "Hexalith.ChatBot.Server",
             "Hexalith.ChatBot.ServiceDefaults",
         ];
+        packageReferences.ShouldContain("Hexalith.EventStore.ServiceDefaults");
         string[] forbiddenPackages = packageReferences
+            .Where(static package => package != "Hexalith.EventStore.ServiceDefaults")
             .Where(package => forbiddenDependencyTokens.Any(
                 token => package.Contains(token, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
