@@ -2182,6 +2182,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Twelve required topology resources share a 10-minute readiness budget originally sized for seven waits.
   evidence: `RequiredTopologyResources` in `TrivialGovernedCommandAspireE2eTests.cs:82-96` now includes parties, projects, Memories, `memories-vectors`, and `memories-graphs`. `TopologyReadinessBudget` remains 10 minutes. Later topology expansion, not this story.
+  resolution: Resolved 2026-11-25. All required resource waits now start concurrently and share the original monotonic readiness budget. Terminal failures cancel and join sibling observations while healthy resources retain their evidence. The all-resource barrier regression and existing cancellation and multi-failure tests pass.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Selecting any external owner key can leave local Memories without JWT wiring.

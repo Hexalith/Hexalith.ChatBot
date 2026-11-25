@@ -1847,6 +1847,28 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     }
 
     [Fact]
+    public async Task RequiredTopologyReadinessShouldStartEveryObservationBeforeCompletingAny()
+    {
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+        TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int entered = 0;
+
+        await TopologyReadinessCoordinator.RunConcurrentPhaseAsync(RequiredTopologyResources, async (resource, token) =>
+        {
+            resource.ShouldNotBeNullOrWhiteSpace();
+            if (Interlocked.Increment(ref entered) == RequiredTopologyResources.Length)
+            {
+                allEntered.TrySetResult();
+            }
+
+            await allEntered.Task.WaitAsync(token).ConfigureAwait(false);
+        }, deadline.Token).ConfigureAwait(true);
+
+        entered.ShouldBe(RequiredTopologyResources.Length);
+    }
+
+    [Fact]
     public async Task TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure()
     {
         IReadOnlyDictionary<string, int> selectedPorts = FourSelectedPorts();
@@ -3159,13 +3181,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     {
         Dictionary<string, int> isolatedHttpPorts = new(StringComparer.Ordinal);
         Stopwatch readinessClock = Stopwatch.StartNew();
-        foreach (string resource in RequiredTopologyResources)
+        int?[] observedHttpPorts = new int?[RequiredTopologyResources.Length];
+        await TopologyReadinessCoordinator.RunConcurrentPhaseAsync(
+            Enumerable.Range(0, RequiredTopologyResources.Length), ObserveResourceAsync, cancellationToken).ConfigureAwait(true);
+
+        for (int index = 0; index < observedHttpPorts.Length; index++)
         {
+            if (observedHttpPorts[index] is { } port)
+            {
+                isolatedHttpPorts.Add(RequiredTopologyResources[index], port);
+            }
+        }
+
+        async Task ObserveResourceAsync(int index, CancellationToken token)
+        {
+            string resource = RequiredTopologyResources[index];
             ResourceEvent resourceEvent = await WaitForResourceHealthyWithinBudgetAsync(
                 app,
                 resource,
                 readinessClock,
-                cancellationToken).ConfigureAwait(true);
+                token).ConfigureAwait(false);
 
             string[] endpoints = resourceEvent.Snapshot.Urls
                 .Where(static url => !url.IsInactive)
@@ -3204,7 +3239,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     $"{resource}/http must expose an absolute runtime URI.");
                 endpointUri.ShouldNotBeNull();
                 endpointUri.Port.ShouldBeGreaterThan(0);
-                isolatedHttpPorts.Add(resource, endpointUri.Port);
+                observedHttpPorts[index] = endpointUri.Port;
             }
         }
 
@@ -3258,14 +3293,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         if (remaining <= TimeSpan.Zero)
         {
             throw new TimeoutException(
-                $"The shared {TopologyReadinessBudget} topology readiness budget was exhausted before '{resource}' "
-                + "was waited on. Earlier resources consumed the whole budget.");
+                $"The shared {TopologyReadinessBudget} topology readiness budget expired before '{resource}' could be observed.");
         }
 
         try
         {
             return await app.ResourceNotifications
-                .WaitForResourceHealthyAsync(resource, cancellationToken)
+                .WaitForResourceHealthyAsync(resource, WaitBehavior.StopOnResourceUnavailable, cancellationToken)
                 .WaitAsync(remaining, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -3285,11 +3319,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         CancellationToken cancellationToken)
     {
         Stopwatch readinessClock = Stopwatch.StartNew();
-        foreach (string resource in resources)
+        await TopologyReadinessCoordinator.RunConcurrentPhaseAsync(resources, async (resource, token) =>
         {
-            _ = await WaitForResourceHealthyWithinBudgetAsync(app, resource, readinessClock, cancellationToken)
-                .ConfigureAwait(false);
-        }
+            _ = await WaitForResourceHealthyWithinBudgetAsync(app, resource, readinessClock, token).ConfigureAwait(false);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<HttpResponseMessage> SubmitUnauthenticatedGovernedNoteAsync(

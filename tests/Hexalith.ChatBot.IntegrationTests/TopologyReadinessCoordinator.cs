@@ -25,22 +25,21 @@ internal static class TopologyReadinessCoordinator
         ArgumentNullException.ThrowIfNull(validateResourceAsync);
         ArgumentNullException.ThrowIfNull(recheckResourceAsync);
 
-        await RunConcurrentPhaseAsync(selectedPorts, validateResourceAsync, cancellationToken).ConfigureAwait(false);
-        await RunConcurrentPhaseAsync(selectedPorts, recheckResourceAsync, cancellationToken).ConfigureAwait(false);
+        await RunConcurrentPhaseAsync(selectedPorts, (resource, token) =>
+            validateResourceAsync(resource.Key, resource.Value, token), cancellationToken).ConfigureAwait(false);
+        await RunConcurrentPhaseAsync(selectedPorts, (resource, token) =>
+            recheckResourceAsync(resource.Key, resource.Value, token), cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task RunConcurrentPhaseAsync(
-        IReadOnlyDictionary<string, int> selectedPorts,
-        Func<string, int, CancellationToken, Task> validateResourceAsync,
+    /// <summary>Starts all observations and cancels and joins sibling work after a failure.</summary>
+    internal static async Task RunConcurrentPhaseAsync<TResource>(
+        IEnumerable<TResource> resources,
+        Func<TResource, CancellationToken, Task> validateResourceAsync,
         CancellationToken cancellationToken)
     {
         using CancellationTokenSource siblingSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        List<Task> remaining = selectedPorts
-            .Select(pair => InvokeValidationAsync(
-                validateResourceAsync,
-                pair.Key,
-                pair.Value,
-                siblingSource.Token))
+        List<Task> remaining = resources
+            .Select(async resource => await validateResourceAsync(resource, siblingSource.Token).ConfigureAwait(false))
             .ToList();
         Exception? firstFailure = null;
         while (remaining.Count > 0 && firstFailure is null)
@@ -87,11 +86,4 @@ internal static class TopologyReadinessCoordinator
 
         ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }
-
-    private static async Task InvokeValidationAsync(
-        Func<string, int, CancellationToken, Task> validateResourceAsync,
-        string resourceName,
-        int expectedPort,
-        CancellationToken cancellationToken)
-        => await validateResourceAsync(resourceName, expectedPort, cancellationToken).ConfigureAwait(false);
 }
