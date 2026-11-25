@@ -246,16 +246,9 @@ public sealed partial class CommandGatewayTests
         {
             status.ReleaseFirstWrite();
         }
-        if (failInitialWrite)
-        {
-            await Should.ThrowAsync<InvalidOperationException>(() => initial);
-        }
-        else
-        {
-            ChatBotGatewayResult original = await initial.ConfigureAwait(true);
-            original.IsAccepted.ShouldBeTrue();
-            AssertPreparedOutcome(original.Accepted!, receipt);
-        }
+        ChatBotGatewayResult original = await initial.ConfigureAwait(true);
+        original.IsAccepted.ShouldBeTrue();
+        AssertPreparedOutcome(original.Accepted!, receipt);
         ChatBotGatewayResult recovered = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
         recovered.IsAccepted.ShouldBeTrue();
         AssertPreparedOutcome(recovered.Accepted!, receipt);
