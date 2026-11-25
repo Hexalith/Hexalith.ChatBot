@@ -49,8 +49,7 @@
 
             @if (State.Value.ErrorCode is { } error)
             {
-                @* The summary owns the focus target and precedes the panel it describes, so a validation or
-                   failure summary is reached before the fields it is about. *@
+                @* The failure summary owns the page-level focus target. Validation feedback belongs to the form. *@
                 <div @ref="_errorSummary" tabindex="-1" class="chatbot-association-review__summary">
                 <ChatBotStatusBanner Kind="@FailureKind(error)"
                                      MessageCatalogCode="@AssociationReviewFailureCatalog.CatalogCode(error)"
@@ -296,21 +295,15 @@
             await FocusEvidenceElementAsync(EvidenceCloseId).ConfigureAwait(true);
         }
 
-        // A validation or failure summary must take focus so the reviewer lands on the reason rather than
-        // discovering it only if they happen to scroll. Guarded on the code and its failure activation so
-        // re-renders do not steal focus back while the same error is still on screen, while a retry that fails
-        // again with the same code takes focus once more.
-        (string? Code, long Activation) current = (State.Value.ValidationErrorCode ?? State.Value.ErrorCode, State.Value.FailureActivation);
-        if (string.Equals(current.Code, _announcedFailure.Code, StringComparison.Ordinal)
-            && current.Activation == _announcedFailure.Activation)
+        AssociationReviewState state = State.Value;
+        if (state.ErrorCode is { Length: > 0 } code && _errorSummary is { } summary)
         {
-            return;
-        }
-
-        _announcedFailure = current;
-        if (current.Code is { Length: > 0 } && _errorSummary is { } summary)
-        {
-            await summary.FocusAsync().ConfigureAwait(true);
+            var current = (code, state.FailureActivation);
+            if (current != _announcedFailure)
+            {
+                _announcedFailure = current;
+                await summary.FocusAsync().ConfigureAwait(true);
+            }
         }
     }
 

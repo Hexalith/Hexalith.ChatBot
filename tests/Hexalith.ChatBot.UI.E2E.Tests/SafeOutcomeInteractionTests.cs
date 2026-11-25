@@ -215,6 +215,43 @@ public sealed class SafeOutcomeInteractionTests
         }, associationState: state, jsRuntime: js);
     }
 
+    /// <summary>A mounted failure summary takes focus while validation stays with the form.</summary>
+    [Fact]
+    public Task AssociationReviewValidationAfterFailureShouldKeepFocusInTheForm()
+    {
+        const string AssociationId = "association-001";
+        AssociationReviewModel review = new(
+            AssociationId, "intake-001", "mailbox-001", "conversation-001", null, "NeedsReview",
+            "CandidatesGenerated", "Ambiguous", 0.5, [], [], [], [], [], "policy", "kernel",
+            DateTimeOffset.UnixEpoch, "mailbox", "metadata_only", "collaboration_input", "v1", 1, "correlation-001");
+        SafeOutcomeRenderState<AssociationReviewState> state = new(new(false, false, review, null, "", "", null, null));
+        InteractionRenderJsRuntime js = new();
+        return RunAsync(async (renderer, _) =>
+        {
+            Dictionary<string, object?> route = new() { [nameof(AssociationReview.AssociationId)] = AssociationId };
+            AssociationReview page = await renderer.MountAsync<AssociationReview>(route).ConfigureAwait(true);
+            await renderer.Dispatcher.InvokeAsync(async () =>
+            {
+                js.FocusedElements.ShouldBeEmpty();
+
+                state.Value = AssociationReviewReducers.ReduceSubmitFailed(
+                    AssociationReviewReducers.ReduceSubmitStarted(state.Value), new(ChatBotMessageCodes.DependencyDegraded));
+                await renderer.UpdateAsync(page, route).ConfigureAwait(true);
+                renderer.Find<ChatBotStatusBanner>(page).ShouldContain(banner => banner.StableId == "association-review-failed");
+                ElementReference focusedSummary = js.FocusedElements.ShouldHaveSingleItem();
+
+                state.Value = AssociationReviewReducers.ReduceDecisionRejected(
+                    AssociationReviewReducers.ReduceSubmitStarted(state.Value), new("candidate-required"));
+                await renderer.UpdateAsync(page, route).ConfigureAwait(true);
+                renderer.Find<ChatBotStatusBanner>(page).ShouldNotContain(banner => banner.StableId == "association-review-failed");
+                ChatBotAssociationReviewActions actions = renderer.Find<ChatBotAssociationReviewActions>(page).ShouldHaveSingleItem();
+                renderer.Find<ChatBotStatusBanner>(actions).ShouldContain(
+                    banner => banner.StableId.EndsWith("-association-review-validation", StringComparison.Ordinal));
+                js.FocusedElements.ShouldHaveSingleItem().ShouldBe(focusedSummary);
+            }).ConfigureAwait(true);
+        }, associationState: state, jsRuntime: js);
+    }
+
     /// <summary>A new composer instance can announce a same-code submission in the same circuit.</summary>
     [Fact]
     public Task ComposerSubmissionShouldAnnounceAcrossRemount()

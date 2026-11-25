@@ -2350,3 +2350,4 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: A validation code shown after an association-review failure can send focus to the removed failure-summary element.
   evidence: Unverified medium, pre-existing. The focus guard reads `ValidationErrorCode ?? ErrorCode` and focuses `_errorSummary`, which only renders while `ErrorCode` is set. The validation banner in `ChatBotAssociationReviewActions.razor` has no focus target of its own. Settle with a browser test that fails, then validates on the same page.
+  resolution: Resolved 2026-11-25. The page-level focus target is limited to the mounted failure summary. The interactive renderer verified that a subsequent validation rejection renders inline without moving focus. Both focused interaction tests passed.
