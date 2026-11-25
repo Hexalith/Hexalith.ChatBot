@@ -57,7 +57,13 @@ internal sealed class LiveRecoverySweep
     internal async Task RunAsync()
     {
         RequireTier3Runtime();
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        TimeSpan workflowTimeout = RecoveryWorkflowTimeout(
+            Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES"));
+        // Setup and scenarios draw from the same in-process budget. Start it before
+        // creating the isolated backend so there is time to restore before SIGINT.
+        using CancellationTokenSource workflowDeadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        workflowDeadline.CancelAfter(workflowTimeout);
+        CancellationToken cancellationToken = workflowDeadline.Token;
         string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
         // Minted from a CSPRNG, not from the ULID correlation-id generator. ULIDs are time-ordered with a predictable
         // timestamp prefix and the same generator produces the runId that is published in evidence artifacts, so a
@@ -259,8 +265,7 @@ internal sealed class LiveRecoverySweep
                 // LiveContinuityAspireE2eContractTests.HostedControlledLossBudgetCanMeasurePastRpoTargetWithinSmallestWorkflowWindow.
                 PerScenarioTimeout = TimeSpan.FromMinutes(20),
                 RestorationTimeout = TimeSpan.FromMinutes(3),
-                WorkflowTimeout = RecoveryWorkflowTimeout(
-                    Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES")),
+                WorkflowTimeout = workflowTimeout,
                 EvidenceDirectory = evidenceDirectory,
                 EvidenceLocator = EvidenceArtifactLocator(),
             };
@@ -271,12 +276,7 @@ internal sealed class LiveRecoverySweep
             durableState.RequestTimeout.ShouldBe(options.RestorationTimeout);
             rebuildEraseTimeout = options.RestorationTimeout;
 
-            // Enforce the configured WorkflowTimeout in-process. Without it the only real bound was the GitHub
-            // `timeout-minutes: 330`, so a hung scenario was killed by the runner mid-injection with no `finally`
-            // reached — leaving EventStore or Keycloak stopped instead of failing closed with cleanup.
-            using CancellationTokenSource workflowDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            workflowDeadline.CancelAfter(options.WorkflowTimeout);
-            CancellationToken workflowToken = workflowDeadline.Token;
+            CancellationToken workflowToken = cancellationToken;
             AspireRecoverySandboxOperations operations = new(
                 application,
                 eventStore,

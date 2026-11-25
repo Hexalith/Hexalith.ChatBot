@@ -63,6 +63,7 @@ severity: medium
 reason: **[MEDIUM · NFR41]** Identity/Graph scope stamps still minted via post-hoc `/scope-observation`. Reconfirmed on ops-harness chunk. **Release-claim impact:** NFR41 figures remain provisional (sandbox self-timing). **Owner:** existing NFR41 / evidence-integrity residual. **Closure evidence:** honest product monitoring clocks or explicit unmeasurable.
 status: open
 triage: 2026-11-24 Skipped. A Graph/Identity subset of DW-45. Product monitoring observations are unavailable on the scoped-outage lane.
+triage: 2026-11-25 Skipped. Product monitoring clocks are unavailable. Closing this subset of DW-45 requires independent observations or an approved unmeasurable gate outcome.
 
 ### DW-9: [MEDIUM · RPO bound] Continuity `LastCommittedAtUtc` is harness `UtcNow` after projection wait, not an EventStore commit stamp. Entangled with green-path Zero-RPO residual.
 
@@ -114,6 +115,7 @@ severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING`] E2E `RestorationTimeout = 3 minutes` vs A10/NFR56 `MaxRto` 4 hours.** Reconfirmed. **Release-claim impact:** do not cite this lane as confirming RTO ≤ 4 hr. **Owner:** Architecture/DevOps. **Closure evidence:** per existing entry.
 status: open
 triage: 2026-11-24 Skipped. Same full-window limitation and closure criteria as DW-58.
+triage: 2026-11-25 Skipped. Duplicates the full-window qualification in DW-58.
 
 ### DW-16: [MEDIUM · NFR41] Scoped-outage missing/degenerate monitoring → driver unmeasurable conversion still open. Ops reject bad stamps; driver path to audited unmeasurable remains.
 
@@ -293,6 +295,7 @@ severity: medium
 reason: **[MEDIUM · `RV-EVIDENCE-KINDS`] Missing logs/traces/metrics/state-end-state evidence kinds remain a platform residual.** Chunk 1d owes only stamping `RV-EVIDENCE-KINDS` on manifests (patch); producing the artifacts stays deferred. **Release-claim impact:** as on the existing `RV-EVIDENCE-KINDS` entry. **Owner:** Architecture/DevOps with observability. **Closure evidence:** per existing residual.
 status: open
 triage: 2026-11-24 Skipped. Required residual stamps already ship. The outstanding artifact collection is tracked in DW-59.
+triage: 2026-11-25 Skipped. The residual marker already ships. Actual telemetry and retained state evidence are tracked in DW-59.
 
 ### DW-41: [LOW · Aspire/E2E options] `EventStoreDurableStateProbe` uses fixed 30s/250ms/10s bounds unbound from `LiveRecoveryValidationOptions.RestorationTimeout`.
 
@@ -316,6 +319,7 @@ severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE`] NFR59 unauthorized-mutation / cross-tenant flags remain structurally unreachable for the four sandbox deps.** Fault/commit pairs are mutually exclusive by stub design; foreign-tenant effect writes are blocked by `Authorized`. Already covered by chunk 1b decision 2. **Release-claim impact:** do not treat sandbox Contained NFR59 flags as product isolation proof. **Owner:** provider-integration / `RV-PROVIDER-SCALE`. **Closure evidence:** per existing residual.
 status: open
 triage: 2026-11-24 Skipped. Requires product-composed dependency faulting and real authorization/end-state measurements under DW-57.
+triage: 2026-11-25 Skipped. Needs product provider faulting and independent authorization and state measurements under DW-57.
 
 ### DW-44: [MEDIUM · `RV-PROVIDER-SCALE`] NFR58 `scope_escape` remains unreachable on the four-dep happy path.
 
@@ -325,6 +329,7 @@ severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE`] NFR58 `scope_escape` remains unreachable on the four-dep happy path.** Exercises emit the canonical signal; the monitor maps that signal to the ExpectedScope value. **Release-claim impact:** sandbox Contained must not be cited as product scope-containment proof. **Owner:** `RV-PROVIDER-SCALE`. **Closure evidence:** per existing residual.
 status: open
 triage: 2026-11-24 Skipped. Requires a product scope observation path under DW-57. The sandbox scope mapping is fixed by design.
+triage: 2026-11-25 Skipped. Needs product scope observations under DW-57. The sandbox scope mapping is fixed.
 
 ### DW-45: [MEDIUM · chunk 1a/1b carry] NFR41 stamps are sandbox self-timing (control POST / `UtcNow` + 200 ms poll), not product monitoring evidence.
 
@@ -334,6 +339,7 @@ severity: medium
 reason: **[MEDIUM · chunk 1a/1b carry] NFR41 stamps are sandbox self-timing (control POST / `UtcNow` + 200 ms poll), not product monitoring evidence.** Continues the open driver/monitor honesty residual. **Release-claim impact:** NFR41 figures remain provisional. **Owner:** Story 12.15 evidence-integrity (driver + monitor). **Closure evidence:** honest observation clocks or explicit unmeasurable when product monitoring is absent.
 status: open
 triage: 2026-11-24 Skipped. The scoped-outage lane has no independently published product-monitoring clocks. The current gate requires NFR41 measurements.
+triage: 2026-11-25 Skipped. The existing qualification gate requires measured NFR41 assertions. Independent product monitoring or an approved explicit unmeasurable evidence policy is needed.
 
 ### DW-46: [LOW · Aspire continuity ops] Subscription simulator restore does not reset absolute processing counters.
 
@@ -350,6 +356,7 @@ severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE` · decision 2] Four generic scoped deps remain sandbox-contract Contained.** Administrator chose option 2 (2026-08-03): keep provisional-live sandbox evidence; claim narrowing recorded on the existing `RV-PROVIDER-SCALE` entry (see 2026-08-03 update). **Release-claim impact:** as on that entry. **Owner:** performance/capacity and provider-integration owners. **Closure evidence:** product-composed client paths for the four tokens under the same gate.
 status: open
 triage: 2026-11-24 Skipped. Requires product-composed provider fault seams under DW-57. The approved sandbox contract remains provisional.
+triage: 2026-11-25 Skipped. The recorded decision keeps sandbox evidence provisional. Product provider fault seams under DW-57 are needed.
 
 ### DW-48: [HIGH · `RV-MEASURABLE-CEILING`] Tier-3 E2E sets `RestorationTimeout = 3 minutes` while A10/NFR56 `MaxRto` remains 4 hours.
 
@@ -359,6 +366,7 @@ severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING`] Tier-3 E2E sets `RestorationTimeout = 3 minutes` while A10/NFR56 `MaxRto` remains 4 hours.** Already tracked as `RV-MEASURABLE-CEILING`; reconfirmed in chunk 1b against `LiveContinuityAspireE2eTests`. A recovery between 3m and 4h becomes `unmeasurable`, never a measurable miss. **Release-claim impact:** do not cite this lane as confirming RTO ≤ 4 hr. **Owner:** Architecture/DevOps. **Closure evidence:** per existing `RV-MEASURABLE-CEILING` entry.
 status: open
 triage: 2026-11-24 Skipped. Duplicate of the full-window recovery limitation in DW-58.
+triage: 2026-11-25 Skipped. Duplicates the full-window qualification in DW-58.
 
 ### DW-49: [HIGH · `RV-REBUILD-WORM`] Live E2E still passes the same `SourceRecords` instance to seed and rebuild driver.
 
@@ -407,6 +415,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires an approved Microsoft Graph test tenant, permissions and retained external drill evidence.
 decision: 2026-08-27 Build Graph drill — Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.
 decision: 2026-08-26 Build Graph drill — Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.
+triage: 2026-11-25 Skipped. Requires an approved real Graph test tenant and a retained external drill.
 
 ### DW-55: [HIGH · `RV-DURABLE-WORM` · durable audit-storage fidelity] Projection rebuild and audit-store fault validation still use `InMemoryWormAuditStore` or a test-hosted `IAuditWriter`.
 
@@ -418,6 +427,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires the approved durable WORM/KMS production binding and retained outage and restore evidence.
 decision: 2026-08-27 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 decision: 2026-08-26 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
+triage: 2026-11-25 Skipped. Requires the approved durable WORM and KMS binding and retained outage and recovery proof.
 
 ### DW-56: [HIGH · `RV-PROD-CONTROL` · production orchestration and replica coordination] The destructive scheduler runs isolated GitHub/Aspire test jobs, not a production AKS/multi-replica control plane.
 
@@ -429,6 +439,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires an approved multi-replica pre-production platform and bounded control permissions.
 decision: 2026-08-27 Build platform drill — Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.
 decision: 2026-08-26 Build platform drill — Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.
+triage: 2026-11-25 Skipped. Requires an approved multi-replica platform and scoped fault-control authority.
 
 ### DW-57: [MEDIUM · `RV-PROVIDER-SCALE` · provider, product-composition, and workload scale] Local provider/component contract implementations and the configured six-record baseline do not represent product DI composition, production volume, latency, replicas, quotas, or regional failure modes.
 
@@ -440,6 +451,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires an approved production workload, replica and failure profile with retained product evidence.
 decision: 2026-08-27 Build production-shaped lane — Exercise product-composed clients at an approved dataset, replica count, quota, latency, and regional failure profile with retained end-state evidence.
 decision: 2026-08-26 Build production-shaped lane — Exercise product-composed clients at an approved dataset, replica count, quota, latency, and regional failure profile with retained end-state evidence.
+triage: 2026-11-25 Skipped. Requires an approved product workload, capacity and failure profile with retained evidence.
 
 ### DW-58: [HIGH · `RV-MEASURABLE-CEILING` · the lane cannot reach the targets it is cited for] The Tier-3 restoration budget is 180 seconds against a 4-hour RTO (A10/NFR56) and a 4-hour rebuild target (NFR57).
 
@@ -451,6 +463,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires a separately approved full-window lane and retained pass and measurable-miss evidence.
 decision: 2026-08-27 Build full-window evidence — Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.
 decision: 2026-08-26 Build full-window evidence — Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.
+triage: 2026-11-25 Skipped. Requires a separately approved full-window run with retained boundary-pass and measurable-miss evidence.
 
 ### DW-59: [MEDIUM · `RV-EVIDENCE-KINDS` · the retained evidence bundle carries no logs, traces, metrics or state-store end-state] The manifest requires only `test-output` and `reports`.
 
@@ -460,6 +473,7 @@ severity: medium
 reason: **[MEDIUM · `RV-EVIDENCE-KINDS` · the retained evidence bundle carries no logs, traces, metrics or state-store end-state] The manifest requires only `test-output` and `reports`.** Task 2 and the "Evidence is retained and reviewable" obligation originally required links to raw CI artifacts, logs, traces, metrics, state-store end-state and test output; `RecoveryValidationEvidenceManifest` requires two kinds, and both workflows upload `TestResults` only. Requiring the other four did not make them exist — it guaranteed every manifest carried syntactically valid links to nothing, which `IsSafeArtifactLocator` (a syntax check) cannot detect. Round 5 narrowed the obligation to what the lane produces rather than leaving the documents asserting six. **Release-claim impact:** a reviewer investigating a failed or disputed run has the `.trx` and the retained reports/manifests only; there is no trace, metric or state-store end-state evidence to corroborate a verdict, so a disputed measurement cannot be independently reconstructed from the artifact. **Owner:** Architecture/DevOps with observability. **Closure evidence:** the lane emits OTLP traces and metrics plus a state-store end-state dump into `TestResults`, both workflows upload them, the manifest requires the full vocabulary again, and a test asserts each required locator resolves to a file the workflow actually produces. [`src/Hexalith.ChatBot.Server/Audit/RecoveryValidationEvidenceManifest.cs`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`]
 status: open
 triage: 2026-11-24 Skipped. Requires live collection of sanitized telemetry, state snapshots and verified hosted artifact retention.
+triage: 2026-11-25 Skipped. Requires sanitized live logs, OTLP and state capture, plus retained hosted evidence.
 
 ### DW-60: [LOW] `TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure` is a flaky concurrency test.
 
@@ -493,6 +507,7 @@ triage: 2026-11-24 Skipped. The scheduler remains dependent on process-local out
 decision: 2026-08-27 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 decision: 2026-08-26 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 resolution-note: Story 12.16 replaces only the Production derived-store and vector-reindex defaults with validated Hexalith.Memories service/client adapters. This entry stays open because the outbound-trace, WORM-audit, and operator-alert sinks remain process-local and the live Aspire acceptance lane was not executable without the configured mailbox client secret.
+triage: 2026-11-25 Skipped. Requires production outbound-trace, WORM and alert bindings and tenant evidence.
 
 ### DW-64: [MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.
 
@@ -504,6 +519,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires a shared cadence store and distributed fencing through audit and alert side effects plus replica validation.
 decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
 decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
+triage: 2026-11-25 Skipped. Requires a shared cadence store with fencing through audit and alert side effects, plus replica qualification.
 
 ### DW-65: [HIGH · owned by Story 12.16] The periodic correction-propagation SLO-deadline sweep (AC1 item 5) was never built.
 
@@ -616,6 +632,7 @@ severity: medium
 reason: **[MEDIUM] Workspace-mode package-authority enforcement runs in no CI.** `validate-consumer-package-authority.ps1` (workspace/consumer mode) and `validate-package-version-exceptions.ps1` (workspace mode) are the story's actual enforcement mechanisms, but Builds CI runs the consumer validator only against Builds itself and the exception validator only in schema mode, and ChatBot `ci.yml`/`release.yml` invoke neither. Until wired, the closed SDK/tool allowlist and consumer exclusivity are enforced only by convention plus ChatBot's architecture tests. Owned by Story 1.1f (reusable domain-module CI/CD alignment proposal 2026-07-18).
 status: open
 triage: 2026-11-24 Skipped. Workspace CI enforcement belongs to the separately tracked Hexalith.CiCd adoption and Builds ownership work.
+triage: 2026-11-25 Skipped. Workspace CI enforcement belongs to Builds and the Hexalith.CiCd adoption.
 
 ### DW-81: [LOW] Partial/standalone checkout rough edges in path-resolution conventions.
 
@@ -665,6 +682,7 @@ reason: **[LOW · durable activity CT]** Workflow activities pass `CancellationT
 status: open
 decision: 2026-08-28 Document durable completion — Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.
 decision: 2026-08-28 Document durable completion — Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.
+triage: 2026-11-25 Skipped. Replay can repeat audit and operator alerts. The alert sink has no idempotency key, so a documented cancellation choice alone cannot prove safe eventual completion.
 
 ### DW-87: [MEDIUM · terminal failure ownership] Distinct correction-propagation workflow `Failed` status deferred; Story 2.9 keeps `Correction-delayed` for store/soft failures.
 
@@ -711,6 +729,7 @@ status: open
 triage: 2026-11-24 Skipped. Requires package-owner compatibility ratification and the decision record for the retained MCP surface.
 decision: 2026-08-27 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 decision: 2026-08-26 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
+triage: 2026-11-25 Skipped. Requires the retained MCP surface's package-owner compatibility decision.
 
 ### DW-93: [MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.
 
@@ -747,6 +766,7 @@ reason: **[LOW · observability] Three projection log event ids are duplicated w
 status: open
 decision: 2026-08-27 Renumber with migration — Assign unique ids, publish an operator-facing filter migration note, update tests, and empty the collision allowlist.
 decision: 2026-08-26 Renumber with migration — Assign unique ids, publish an operator-facing filter migration note, update tests, and empty the collision allowlist.
+triage: 2026-11-25 Skipped. EventStore owns the emitted IDs and the operator filter migration.
 
 ### DW-97: [MEDIUM · diagnosis] B4 — the scoped-outage control probe's catch scope is wider than the request it classifies.
 
@@ -777,6 +797,7 @@ severity: medium
 reason: **[MEDIUM · test-design] D2 — three of four checkpoint-refusal reason codes are unasserted.** `ProjectionCheckpointRefusalDiagnosticsTests` covers `post-cutover-writer-protocol` only. **Not covered:** `delivery-row-requires-fenced-completion`, `delivery-row-schema-regression`, `delivery-row-unsupported` — each needs a delivery row that `ProjectionDeliveryStateClassifier` classifies accordingly, which the current fixture cannot build. A draft covering them was written and **reverted rather than shipped half-working**; the gap is also recorded in the test's own remarks. Its `GetStateAsync<ProjectionDeliveryState?>` arrangement is additionally inert, because production reads through `GetStateAndETagAsync`, so that precondition comes from NSubstitute's default rather than the stub. **Owner:** Hexalith.EventStore.
 status: open
 triage: 2026-11-24 Skipped. The classifier, checkpoint tracker and existing diagnostics tests are owned by Hexalith.EventStore.
+triage: 2026-11-25 Skipped. EventStore owns the refusal classifier, tracker and diagnostics tests.
 
 ### DW-101: [MEDIUM · test-design] D5 — the capture-filter fix is untested and its token check is approximate.
 
@@ -975,6 +996,7 @@ source_spec: `spec-release-workflow-safety.md`
 severity: low
 reason: `.github/workflows/` contains no actionlint or shellcheck step; the spec's Verification section runs actionlint locally only, and shellcheck is unavailable in this environment. The publication guard and merge-ref boundaries are now safety-critical Bash with no static gate, and the existing `.github/scripts/install-dapr-cli.sh` is equally unguarded, so this predates the current change.
 status: open
+triage: 2026-11-25 Skipped. Workflow linting belongs to Hexalith.CiCd's delivered CI policy.
 
 ### DW-130: The required `build` job's ordinary test lanes have no zero-test guard, so a lane that discovers no tests exits 0 and still emits a checksummed TRX that reads as real evidence.
 
@@ -1125,6 +1147,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: A committed EventStore command can lose its downstream correction or ingestion workflow scheduling obligation.
   evidence: Loop 15 BH2 verified that the canonical baseline already submits the domain command before scheduling the workflow, without durable reconciliation across scheduling failure or process termination. SDK commit proof restores the accepted receipt but cannot establish or repair that pre-existing scheduling obligation; a durable scheduling recovery must not resubmit the domain command.
+  triage: 2026-11-25 Skipped. Needs durable, owner-bound scheduling reconciliation without resubmitting the committed command.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: A fast workflow can publish completion before acceptance initializes its operation-status record and have the report discarded.
   evidence: Loop 15 BH3 verified the baseline status sink returns on a missing operation record, while the baseline dispatcher starts workflows before the gateway initializes status. Preserving early reports requires a status initialization and merge lifecycle that also avoids overwriting terminal progress.
@@ -1635,6 +1658,7 @@ archived: 2026-11-24
   summary: Repair the existing Story 13.2 live browser fixture's current owner-authority prerequisites before claiming a passing production-client refusal matrix (high; pre-existing at the Story 1.7 baseline).
   evidence: `Story132ProductionBrowserAspireE2ETests` initializes the realm and recovery protocol but no current ChatBot operation/query grant, Party identity or Project authority. `AddStory132AcceptanceFixture` replaces only policy/provider/classifier services. The authoritative authorizer, acceptance fixture and recovery provisioner are unchanged from baseline `cd8314401488c7ba3453cec25bdf305e34e0d146`, whose positive-submit browser test already omitted the same owner prerequisites. Fresh state denies before the asserted 503 and before an authorized conversation can enable the composer. Closure requires owner-supported fixture provisioning and an executed fresh-state browser result; the unavailable atomic participation must not be bypassed, authority must not be fabricated and a 403 must not be represented as a passed 503 boundary.
   triage: 2026-11-24 Skipped. The live browser fixture still needs current owner grants, and another session holds uncommitted edits to `Story132ProductionBrowserAspireE2ETests.cs`.
+  triage: 2026-11-25 Skipped. The owner-bound acceptance prerequisites and a passing fresh live browser result are still needed.
 
 ## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-21, round 3)
 
@@ -1740,10 +1764,12 @@ archived: 2026-11-24
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carried existing BH-5 / Current-BH-2 obligation to defensively copy provider-owned AI policy lists and maps before enabling a live provider (medium; no new scope).
   evidence: Round29-6 reconfirms that `TenantAiPolicySnapshot` still retains caller-owned collections under read-only interfaces. Mutation can change permissions under the same policy identity. This predates the Story 1.6 baseline; the separate synthetic snapshot model copies collections, and production still uses the unavailable provider. This review references the existing obligation rather than creating another implementation task.
+  resolution: 2026-11-25 Already addressed. TenantAiPolicySnapshot owns immutable copies of both collections, including record copies, and SnapshotShouldOwnItsPolicyCollections verifies both paths.
 
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carried existing R4-BH-2 / Current-BH-3 obligation to establish provider-collection failure containment before live activation (unverified medium; no new scope).
   evidence: Round29-5 reconfirms enumeration and lookup outside `DefaultAiActionPolicyEvaluator`'s provider-call catch. Current providers return ordinary arrays/maps and production returns null. A supported provider whose collection access throws would settle reachability and require a redacted unavailable decision. This review references the existing verification obligation rather than creating another implementation task.
+  resolution: 2026-11-25 Already addressed. Collection materialization occurs inside provider resolution, and ThrowingProviderCollectionMustReturnRedactedUnavailable verifies a safe failure for both collections.
 
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
@@ -1759,6 +1785,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
   summary: Give the Projects owner client a dedicated audience so its token no longer authenticates at EventStore and EventStore Admin.
   evidence: Projects shares the `hexalith-eventstore` audience (`src/Hexalith.ChatBot.AppHost/Program.cs:267`, `:296`, `:319`). Round 2 closed the tenant-scoped reach by omitting `eventstore:tenant` from owner tokens. The token still authenticates at EventStore, so anything gated only on authentication is reachable. A dedicated audience needs a Projects-owned change: `ProjectsAuthenticationServiceCollectionExtensions.cs:90` validates a single `ValidAudience`, and `EventStoreGatewayTokenForwardingHandler` forwards caller bearers to the EventStore command gateway, which requires `hexalith-eventstore`.
+  triage: 2026-11-25 Skipped. Projects and EventStore own the receiver and token forwarding contract that must change together.
 
 
 ## Folders attachment owner-evidence follow-up (2026-10-25)
@@ -2074,11 +2101,13 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: R21-W2 — The replacement nightly hook never uploads the evidence artifact that the recovery manifests name (medium, latent).
   evidence: `LiveRecoverySweep.EvidenceArtifactLocator()` (`tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoverySweep.cs:740-743`) stamps `artifact:live-recovery-validation-evidence` unless `HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT` is set. `.github/actions/nightly/action.yml` sets no locator, and nothing uploads `TestResults/live-recovery/<runId>` or the retention-failure markers under `$RUNNER_TEMP`. The central `references/Hexalith.Builds/.github/workflows/release.yml:165-166` runs the hook without uploading anything afterwards. The locator's own summary records the same defect as a past fix.
+  resolution: 2026-11-25 Already addressed in the product hook. The composite action publishes the bounded bundle under the required artifact name. Central activation is tracked separately.
   reason: Outside Story 1.5 (shared-CI migration files), and latent until the hook is enabled.
   closure: When the hook is enabled, upload both directories under the locator's name, or set the variable to the uploaded name, and pin that binding with a guard.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: R21-W3 — The recovery in-process deadline is set only in the nightly action's environment (low).
   evidence: The comment in `.github/actions/nightly/run-recovery.sh:18` relies on "the 250-minute in-process deadline", but only `action.yml:17` sets `HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES` to `250`. Without it, `RecoveryWorkflowTimeout` defaults to 300 minutes (`LiveRecoverySweep.cs:796`), which is after the 280-minute SIGINT and equal to the 300-minute TERM bound. The guards that pinned the order (in-process deadline, then SIGINT, then the step limit) were deleted with `LiveRecoveryValidationArchitectureTests` in `bf0f44f`.
+  resolution: Resolved 2026-11-25. The nightly hook now validates and supplies the 230–250 minute in-process budget for direct and composite invocations. The shared timer starts before the private backend is created, and the 280-minute outer interrupt remains separate. Script tests verify the default, lower boundary and invalid overrides.
   reason: Outside Story 1.5. The action is the script's only caller, and it is not enabled.
   closure: When the hook is enabled, export the default in the script or guard both files.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
@@ -2174,6 +2203,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: The required topology-acceptance job still filters a Fact that now lives only on Live.IntegrationTests, so the live Running/403 assertions never execute.
   evidence: `ci.yml:433` and `release.yml:72` pass `-method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology` to the IntegrationTests runner. That Fact is only on `tests/Hexalith.ChatBot.Live.IntegrationTests/RequiredTopologyTests.cs:10`. `run-xunit-v4.sh` fails the lane on zero tests, but the live contract is still not run. Caused by the later Live.IntegrationTests split; Hexalith.CiCd owns the workflow files.
+  triage: 2026-11-25 Skipped. The obsolete workflow filter is in the centrally owned workflow. The replacement test exists in Live.IntegrationTests.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Architecture tests no longer pin topology-acceptance `-method` strings, TRX paths, or guard-step names.
@@ -2187,6 +2217,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Selecting any external owner key can leave local Memories without JWT wiring.
   evidence: `Program.cs:163-181` treats any Projects/Memories owner key as `externalOwners`, then optionally keeps the local Memories endpoint when `ChatBot:Memories:Endpoint` is unset, while `:277-285` skips Memories JWT in that mode. Later owner-composition, not this story.
+  resolution: 2026-11-25 Obsolete. The AppHost requires a complete pair of static owner overrides, and ExternalOwnerSelectionShouldRefuseEveryPartialConfiguration covers incomplete selections.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: `Dapr:SpineAppIdSuffix` does not suffix parties or projects app ids.
@@ -2261,6 +2292,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: The recovery-validator sandbox user still carries a static password and bootstrap admin grants.
   evidence: `src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json` user `recovery-validator` includes `global-administrators:bootstrap`. Realm/recovery work, not this story.
+  resolution: 2026-11-25 Obsolete as a privilege defect. The bootstrap claim belongs to admin-user. Recovery-validator is bound only to recovery-validation and intentionally uses the documented synthetic credential.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Ordinary tests never pin the mapped M2 release-gate secret (401 without/wrong header, 200/503 with it).

@@ -22,6 +22,7 @@ class RunRecoveryTests(unittest.TestCase):
 case "$3" in
     300m)
         test "$TMPDIR" = "$TMP" && test "$TMPDIR" = "$TEMP" || exit 91
+        test "$HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES" = "$EXPECTED_DEADLINE" || exit 94
         test "$4" = timeout && test "$5" = --signal=INT && test "$7" = 16800s || exit 95
         printf '%s' "$TMPDIR" > "$FIXTURE_ROOT/scope"
         [[ "$RECOVERY_TEST_MODE" == clean ]] || exit 137
@@ -65,6 +66,11 @@ else:
                 env = dict(os.environ, RUNNER_TEMP=directory, FIXTURE_ROOT=directory,
                            GITHUB_ENV="", RECOVERY_TEST_MODE=mode,
                            PATH=f"{directory}{os.pathsep}{os.environ['PATH']}")
+                env.pop("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES", None)
+                env["EXPECTED_DEADLINE"] = "250"
+                if mode == "clean":
+                    env["EXPECTED_DEADLINE"] = "230"
+                    env["HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES"] = "230"
                 result = subprocess.run(
                     ["bash", str(HOOK)], cwd=root, capture_output=True, text=True, timeout=15,
                     env=env,
@@ -84,6 +90,22 @@ else:
                     "killed": ["ls", "rm", "ls"], "clean": ["ls"], "bad-id": ["ls"],
                     "cleanup-error": ["ls", "rm"], "remaining": ["ls", "rm", "ls"],
                 }[mode])
+
+    def test_rejects_invalid_deadlines_before_preparing_the_producer(self):
+        for deadline in ("", "0", "025", "229", "251", "280", "300", "9999999999", "1+1"):
+            with self.subTest(deadline=deadline), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write_shim(root, "date", "#!/usr/bin/env bash\nprintf '7\\n'\n")
+                result = subprocess.run(
+                    ["bash", str(HOOK)], cwd=root, capture_output=True, text=True, timeout=15,
+                    env=dict(os.environ, RUNNER_TEMP=directory,
+                             HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES=deadline,
+                             PATH=f"{directory}{os.pathsep}{os.environ['PATH']}"),
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("integer from 230 through 250", result.stderr)
+                self.assertEqual(list(root.glob("chatbot-recovery.*")), [])
+                self.assertFalse((root / "TestResults").exists())
 
     @staticmethod
     def write_shim(root, name, script):

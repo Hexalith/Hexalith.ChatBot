@@ -13,8 +13,6 @@ runs:
     - name: Run the complete recovery project when the weekly sweep is due
       if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
       shell: bash
-      env:
-        HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: '250'
       run: bash .github/actions/nightly/run-recovery.sh
     - name: Upload the bounded recovery bundle
       if: ${{ !cancelled() && env.CHATBOT_RECOVERY_BUNDLE_DIR != '' }}

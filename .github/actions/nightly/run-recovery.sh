@@ -13,6 +13,14 @@ if [[ "$weekday" != "7" ]]; then
     exit 0
 fi
 
+deadline="${HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES-250}"
+# Ten 20-minute scenarios plus 30 minutes for setup and cleanup are required.
+if [[ ! "$deadline" =~ ^[1-9][0-9]{2}$ ]] || (( deadline < 230 || deadline > 250 )); then
+    printf 'HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES must be an integer from 230 through 250 for nightly recovery.\n' >&2
+    exit 1
+fi
+export HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES="$deadline"
+
 : "${RUNNER_TEMP:?The prepared nightly runner must provide RUNNER_TEMP}"
 runner_temp="$(cd -- "$RUNNER_TEMP" && pwd -P)"
 producer_root="$(mktemp -d "$runner_temp/chatbot-recovery.XXXXXXXX")"
