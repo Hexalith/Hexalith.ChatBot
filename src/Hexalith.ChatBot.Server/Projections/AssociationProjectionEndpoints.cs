@@ -77,13 +77,14 @@ internal static class AssociationProjectionEndpoints
         ArgumentNullException.ThrowIfNull(handler);
 
         AssociationNotification? notification =
-            AssociationProjectionTranslator.TryCreateNotification(published);
+            await handler.TranslateAsync(published, requireConsecutive: true, cancellationToken).ConfigureAwait(false);
         if (notification is null)
         {
             return Results.Ok();
         }
 
-        _ = await handler.HandleAsync(notification, cancellationToken).ConfigureAwait(false);
+        _ = await handler.HandleAsync(notification,
+            runSideEffects: !AssociationProjectionTranslator.IsSparsePropagation(published), cancellationToken).ConfigureAwait(false);
         return Results.Ok();
     }
 }

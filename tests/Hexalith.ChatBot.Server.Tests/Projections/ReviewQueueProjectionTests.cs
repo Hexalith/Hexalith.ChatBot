@@ -79,6 +79,64 @@ public sealed class ReviewQueueProjectionTests
     }
 
     [Fact]
+    public async Task SdkReplayShouldUseHistoricalCorrectionEvidenceAfterANewerCorrectionIsProjected()
+    {
+        const string tenant = "tenant-alpha";
+        const string associationId = "association-001";
+        const string intakeId = "intake-001";
+        var bytes = new AtomicOperationStatusReadModelStore();
+        var queues = new ReviewQueueStore(bytes);
+        var associations = new InMemoryAssociationProjectionStore();
+        var clock = new SystemClock();
+        var conversation = new InMemoryProjectConversationProjectionStore();
+        var handler = new ChatBotDomainProjectionHandler(null!, null!, new(associations, clock),
+            new(new InMemoryParticipantResolutionProjectionStore(), clock, new UnavailableParticipantDisplayDirectory()),
+            new(conversation), new(conversation), new(conversation), null!, queues);
+
+        ProjectionEventDto Event(long version, string type, object payload)
+            => new(type, JsonSerializer.SerializeToUtf8Bytes(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                "json", version, At.AddMinutes(version), "correlation-001", $"event-{version}");
+
+        PublishedAssociationEvent Correction(long version, string prior, string target) => AssociationProjectionTests.Published(version) with
+        {
+            EventTypeName = AssociationProjectionTranslator.CorrectionAcceptedEventType,
+            IntakeId = intakeId,
+            PriorProjectId = prior,
+            CorrectedProjectId = target,
+        };
+
+        PublishedAssociationEvent first = Correction(1, "project-a", "project-b");
+        PublishedAssociationEvent second = Correction(5, "project-b", "project-c");
+        var delayed = new MailboxAssociationCorrectionPropagationDelayed(associationId, intakeId, tenant,
+            first.SourceMailboxId!, first.SourceConversationId!, first.SourceThreadId, "correction-old", "workflow-old", 1,
+            "project-a", "project-b", At.AddMinutes(3), "operations-admin", "review", "timeout", first.RedactionState!,
+            first.RetentionClass!, "v1", "correlation-001");
+        var started = new MailboxAssociationCorrectionPropagationStarted(associationId, intakeId, tenant,
+            second.SourceMailboxId!, second.SourceConversationId!, second.SourceThreadId, "correction-new", "workflow-new",
+            "project-b", "project-c", ["conversation"], At.AddMinutes(7), At.AddMinutes(8), "operations-admin",
+            "wait", second.RedactionState!, second.RetentionClass!, 5, "v1", "correlation-001");
+        ProjectionEventDto firstAccepted = Event(1, first.EventTypeName!, first);
+        ProjectionEventDto firstDelayed = Event(3, delayed.GetType().FullName!, delayed);
+        ProjectionEventDto secondAccepted = Event(5, second.EventTypeName!, second);
+        ProjectionEventDto secondStarted = Event(7, started.GetType().FullName!, started);
+
+        _ = handler.Project(new(tenant, "chatbot", associationId, [firstAccepted, secondAccepted, secondStarted]));
+        CancellationToken token = TestContext.Current.CancellationToken;
+        (await associations.GetAsync(tenant, associationId, token)).ShouldNotBeNull().WorkflowInstanceId.ShouldBe("workflow-new");
+
+        _ = handler.Project(new(tenant, "chatbot", associationId, [secondStarted, firstDelayed, secondAccepted, firstAccepted]));
+        AssociationCandidateView current = (await associations.GetAsync(tenant, associationId, token)).ShouldNotBeNull();
+        current.WorkflowInstanceId.ShouldBe("workflow-new");
+        current.SourceVersion.ShouldBe(7);
+        current.CorrectedProjectId.ShouldBe("project-c");
+
+        ReviewQueueSubject subject = (await queues.ReadFamilyAsync(tenant, OperationalQueueFamily.AmbiguousAssociation, token))
+            .ShouldHaveSingleItem();
+        subject.History.ShouldContain(transition => transition.Version == 3
+            && transition.State == nameof(LifecycleState.CorrectionDelayed) && transition.At == At.AddMinutes(3));
+    }
+
+    [Fact]
     public async Task ACommittedRetryWaitsForTheExactFailureAndJoinsOneOperation()
     {
         var token = TestContext.Current.CancellationToken;

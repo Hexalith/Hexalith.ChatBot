@@ -47,11 +47,12 @@ internal sealed class ChatBotDomainProjectionHandler(
         int applied = 0;
         int ignored = 0;
 
-        foreach (ProjectionEventDto projectionEvent in request.Events ?? [])
+        AssociationProjectionHandler associationReplay = associationHandler.CreateReplay();
+        foreach (ProjectionEventDto projectionEvent in (request.Events ?? []).OrderBy(static item => item.SequenceNumber))
         {
             List<ReviewQueueTransition> queueFacts = [];
             var normalized = projectionEvent with { EventTypeName = projectionEvent.EventTypeName.Split(',', 2)[0] };
-            if (await ProjectEventAsync(request, normalized, queueFacts, cancellationToken).ConfigureAwait(false))
+            if (await ProjectEventAsync(request, normalized, queueFacts, associationReplay, cancellationToken).ConfigureAwait(false))
             {
                 applied++;
             }
@@ -73,6 +74,7 @@ internal sealed class ChatBotDomainProjectionHandler(
         ProjectionRequest request,
         ProjectionEventDto projectionEvent,
         List<ReviewQueueTransition> queueFacts,
+        AssociationProjectionHandler associationReplay,
         CancellationToken cancellationToken)
     {
         if (projectionEvent.SequenceNumber <= 0 || projectionEvent.Timestamp == default)
@@ -281,8 +283,11 @@ internal sealed class ChatBotDomainProjectionHandler(
         }
 
         if (TryCreatePublishedEvent<PublishedAssociationEvent>(request, projectionEvent) is { } associationEvent &&
-            AssociationProjectionTranslator.TryCreateNotification(associationEvent) is { } associationNotification)
+            await associationReplay.TranslateAsync(associationEvent, requireConsecutive: false, cancellationToken, fallback: associationHandler)
+                .ConfigureAwait(false)
+                is { } associationNotification)
         {
+            _ = await associationReplay.HandleAsync(associationNotification, runSideEffects: false, cancellationToken).ConfigureAwait(false);
             var association = associationNotification;
             bool terminal = association.LifecycleState is not (LifecycleState.NeedsReview or LifecycleState.Deferred or LifecycleState.CorrectionDelayed);
             string[] projects = association.ProjectId is { } project ? [project]
@@ -291,14 +296,18 @@ internal sealed class ChatBotDomainProjectionHandler(
                 association.LifecycleState.ToString(), terminal, association.RoutingReason ?? association.Outcome.ToString(),
                 association.ResponsibleOwnerRole ?? "association-reviewer", association.SafeNextAction ?? (terminal ? "none" : "review"))
                 with { Confidence = (decimal)association.ConfidenceScore, Mailbox = association.SourceMailboxId, Intake = association.IntakeId,
-                    At = association.CorrectedAt ?? association.DecidedAt ?? projectionEvent.Timestamp, OpensWork = !terminal };
+                    At = AssociationProjectionTranslator.IsPropagationEvent(associationEvent.EventTypeName)
+                        ? projectionEvent.Timestamp : association.CorrectedAt ?? association.DecidedAt ?? projectionEvent.Timestamp,
+                    OpensWork = !terminal };
             await PersistQueueAsync(fact, cancellationToken).ConfigureAwait(false);
-            if (association.SupersedesAssociationId is { } prior && prior != association.AssociationId)
+            if (!AssociationProjectionTranslator.IsPropagationEvent(associationEvent.EventTypeName)
+                && association.SupersedesAssociationId is { } prior && prior != association.AssociationId)
             {
                 await PersistQueueAsync(fact with { SubjectId = prior, State = "Superseded", Terminal = true,
                     NextAction = "none", OpensWork = false }, cancellationToken).ConfigureAwait(false);
             }
-            _ = await associationHandler.HandleAsync(associationNotification, cancellationToken).ConfigureAwait(false);
+            _ = await associationHandler.HandleAsync(associationNotification,
+                runSideEffects: !AssociationProjectionTranslator.IsSparsePropagation(associationEvent), cancellationToken).ConfigureAwait(false);
             return true;
         }
 

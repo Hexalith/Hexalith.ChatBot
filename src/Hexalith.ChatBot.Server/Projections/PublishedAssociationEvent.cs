@@ -67,4 +67,5 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("nextSafeAction")] string? SafeNextAction = null,
     [property: JsonPropertyName("externalSender")] MailboxExternalSenderPosture? ExternalSender = null,
     [property: JsonPropertyName("strictnessPolicy")] MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
-    [property: JsonPropertyName("routingReason")] string? RoutingReason = null);
+    [property: JsonPropertyName("routingReason")] string? RoutingReason = null,
+    [property: JsonPropertyName("sourceVersion")] long? PayloadSourceVersion = null);

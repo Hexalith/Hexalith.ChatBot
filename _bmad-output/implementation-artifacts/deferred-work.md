@@ -2338,6 +2338,7 @@ archived: 2026-11-24
 - source_spec: none
   summary: Association correction propagation events omit evidence required by the projection translator.
   evidence: The producer records `MailboxAssociationCorrectionPropagationStarted.cs`, `MailboxAssociationCorrectionStoreInvalidated.cs`, `MailboxAssociationCorrectionPropagationCompleted.cs`, and `MailboxAssociationCorrectionPropagationDelayed.cs` omit `ThresholdPolicyVersion` and `DerivationKernelVersion`. `AssociationProjectionTranslator.cs` requires both before translating the event. Resolve with an ordered merge against the existing association's evidence and tests for out-of-order replay.
+  resolution: Resolved 2026-11-25. Concrete propagation events inherit the matching correction evidence. The tests cover all four payloads, reordered subscription delivery, separate correction generations and historical SDK queue replay.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: A decision or correction failure that completes after the reviewer moved to another association may still be applied, announced and focused on the new association's page.

@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 
 namespace Hexalith.ChatBot.Server.Projections;
@@ -50,6 +51,14 @@ internal static class AssociationProjectionTranslator
             ? published.CorrectedProjectId ?? published.ProjectId
             : published.ProjectId;
         PropagationSnapshot propagation = PropagationFor(published);
+        string? correctionId = published.CorrectionId;
+        string? workflowInstanceId = published.WorkflowInstanceId;
+        if (published.EventTypeName == CorrectionAcceptedEventType && published.PayloadSourceVersion is > 0)
+        {
+            correctionId = DaprCorrectionPropagationCoordinator.CorrectionIdFor(published.AggregateId, published.PayloadSourceVersion.Value);
+            workflowInstanceId = DaprCorrectionPropagationCoordinator.WorkflowInstanceIdFor(
+                published.TenantId, published.AggregateId, correctionId, published.PayloadSourceVersion.Value);
+        }
         return new AssociationNotification(
             published.TenantId,
             published.AggregateId,
@@ -92,8 +101,8 @@ internal static class AssociationProjectionTranslator
             published.CorrectionActorType,
             published.CorrectedAt,
             published.DownstreamImpactStatus ?? propagation.DownstreamImpactStatus,
-            published.CorrectionId,
-            published.WorkflowInstanceId,
+            correctionId,
+            workflowInstanceId,
             propagation.RequiredStoreKeys,
             propagation.CompletedStoreKeys,
             propagation.FailedStoreKeys,
@@ -204,6 +213,16 @@ internal static class AssociationProjectionTranslator
             || string.Equals(eventTypeName, DecisionDeferredEventType, StringComparison.Ordinal)
             || string.Equals(eventTypeName, DecisionNeedsReviewEventType, StringComparison.Ordinal);
 
+    /// <summary>Identifies propagation events that carry only changes to a previously projected correction.</summary>
+    internal static bool IsPropagationEvent(string? eventType)
+        => eventType == CorrectionPropagationStartedEventType || eventType == CorrectionStoreInvalidatedEventType
+            || eventType == CorrectionPropagationCompletedEventType || eventType == CorrectionPropagationDelayedEventType;
+
+    /// <summary>Identifies a correction progress payload that relies on the preceding projection for its evidence.</summary>
+    internal static bool IsSparsePropagation(PublishedAssociationEvent published)
+        => IsPropagationEvent(published.EventTypeName)
+            && (string.IsNullOrWhiteSpace(published.ThresholdPolicyVersion) || string.IsNullOrWhiteSpace(published.DerivationKernelVersion));
+
     private static bool IsCorrectionEvent(string? eventTypeName)
         => string.Equals(eventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal)
             || string.Equals(eventTypeName, CorrectionPropagationStartedEventType, StringComparison.Ordinal)
@@ -283,9 +302,9 @@ internal static class AssociationProjectionTranslator
                 !successful && !string.IsNullOrWhiteSpace(published.StoreKey) ? [published.StoreKey] : [],
                 successful ? 1 : 0,
                 0,
-                published.PropagationStartedAtUtc,
-                published.PropagationCompletedAtUtc,
-                published.PropagationEstimatedCompletionAtUtc,
+                null,
+                null,
+                null,
                 successful ? CorrectionPropagationStatuses.Correcting : CorrectionPropagationStatuses.Failed,
                 true,
                 successful ? CorrectionPropagationStatuses.Correcting : CorrectionPropagationStatuses.Failed);

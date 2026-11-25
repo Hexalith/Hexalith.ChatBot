@@ -357,6 +357,74 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
 
     /// <summary>Foreign domains and unknown event types cannot use a conversation payload to project.</summary>
     [Fact]
+    public async Task FanOutShouldPreserveCorrectionEvidenceThroughConcretePropagationAndReorderedDelivery()
+    {
+        var store = new InMemoryAssociationProjectionStore();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddSingleton<IAssociationProjectionStore>(store)));
+        using HttpClient client = factory.CreateAppChannelClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        PublishedAssociationEvent correction = AssociationProjectionTests.Published(2) with
+        {
+            EventTypeName = AssociationProjectionTranslator.CorrectionAcceptedEventType,
+            PriorProjectId = "prior-project",
+            CorrectedProjectId = ProjectId,
+            CorrectionRationale = "retained rationale",
+        };
+        using HttpResponseMessage accepted = await client.PostAsJsonAsync(FanOutRoute, correction, token);
+        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
+        AssociationCandidateView initial = (await store.GetAsync(Tenant, AssociationId, token)).ShouldNotBeNull();
+        const string correctionId = "correction-001";
+        const string workflowId = "workflow-001";
+        const string storeKey = "conversation";
+        DateTimeOffset timestamp = correction.Timestamp;
+        object started = new MailboxAssociationCorrectionPropagationStarted(AssociationId, initial.IntakeId, Tenant,
+            initial.SourceMailboxId, initial.SourceConversationId, initial.SourceThreadId, correctionId, workflowId,
+            initial.PriorProjectId!, ProjectId, [storeKey], timestamp, timestamp.AddMinutes(1), "operations-admin", "wait",
+            initial.RedactionState, initial.RetentionClass, 2, "v1", correction.CorrelationId!);
+        object invalidated = new MailboxAssociationCorrectionStoreInvalidated(AssociationId, initial.IntakeId, Tenant,
+            initial.SourceMailboxId, initial.SourceConversationId, initial.SourceThreadId, correctionId, storeKey, workflowId,
+            2, initial.PriorProjectId!, ProjectId, timestamp, timestamp.AddSeconds(1), "success", null,
+            initial.RedactionState, initial.RetentionClass, "v1", correction.CorrelationId!);
+        object delayed = new MailboxAssociationCorrectionPropagationDelayed(AssociationId, initial.IntakeId, Tenant,
+            initial.SourceMailboxId, initial.SourceConversationId, initial.SourceThreadId, correctionId, workflowId,
+            2, initial.PriorProjectId!, ProjectId, timestamp.AddSeconds(2), "operations-admin", "review", "timeout",
+            initial.RedactionState, initial.RetentionClass, "v1", correction.CorrelationId!);
+        object completed = new MailboxAssociationCorrectionPropagationCompleted(AssociationId, initial.IntakeId, Tenant,
+            initial.SourceMailboxId, initial.SourceConversationId, initial.SourceThreadId, correctionId, workflowId,
+            2, initial.PriorProjectId!, ProjectId, [storeKey], timestamp.AddSeconds(3), CorrectionPropagationStatuses.Complete,
+            initial.RedactionState, initial.RetentionClass, "v1", correction.CorrelationId!);
+
+        async Task<HttpStatusCode> DeliverAsync(long version, object payload)
+        {
+            using StringContent content = CloudEventContent(EventStoreDelivery(AssociationId, version, payload), nestedMetadata: true);
+            using HttpResponseMessage result = await client.PostAsync(FanOutRoute, content, token).ConfigureAwait(false);
+            return result.StatusCode;
+        }
+
+        (await DeliverAsync(4, invalidated).ConfigureAwait(true)).ShouldBe(HttpStatusCode.InternalServerError);
+        (await DeliverAsync(3, started).ConfigureAwait(true)).ShouldBe(HttpStatusCode.OK);
+        (await DeliverAsync(4, invalidated).ConfigureAwait(true)).ShouldBe(HttpStatusCode.OK);
+        (await DeliverAsync(5, delayed).ConfigureAwait(true)).ShouldBe(HttpStatusCode.OK);
+        (await store.GetAsync(Tenant, AssociationId, token)).ShouldNotBeNull().PropagationStatus.ShouldBe(CorrectionPropagationStatuses.Delayed);
+        (await DeliverAsync(6, completed).ConfigureAwait(true)).ShouldBe(HttpStatusCode.OK);
+        (await DeliverAsync(5, delayed).ConfigureAwait(true)).ShouldBe(HttpStatusCode.OK);
+
+        AssociationCandidateView final = (await store.GetAsync(Tenant, AssociationId, token)).ShouldNotBeNull();
+        final.SourceVersion.ShouldBe(6);
+        final.PropagationStatus.ShouldBe(CorrectionPropagationStatuses.Complete);
+        final.CompletedStoreKeys.ShouldBe([storeKey]);
+        final.IsCorrectedContextStale.ShouldBeFalse();
+        final.ThresholdPolicyVersion.ShouldBe(initial.ThresholdPolicyVersion);
+        final.DerivationKernelVersion.ShouldBe(initial.DerivationKernelVersion);
+        final.ConfidenceScore.ShouldBe(initial.ConfidenceScore);
+        final.Candidates.Select(candidate => candidate.ProjectId).ShouldBe(initial.Candidates.Select(candidate => candidate.ProjectId));
+        final.CorrectionRationale.ShouldBe(initial.CorrectionRationale);
+    }
+
+    [Fact]
     public async Task FanOutShouldIgnoreForeignConcreteEvents()
     {
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();

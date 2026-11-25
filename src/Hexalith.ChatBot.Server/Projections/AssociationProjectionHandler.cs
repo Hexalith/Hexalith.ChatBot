@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
+using Hexalith.ChatBot.Server.Operations;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -32,6 +33,83 @@ internal sealed class AssociationProjectionHandler
         Ignored,
     }
 
+    /// <summary>Creates a request-local fold so SDK replay can reconstruct earlier correction generations.</summary>
+    internal AssociationProjectionHandler CreateReplay() => new(new InMemoryAssociationProjectionStore(), _clock);
+
+    /// <summary>Restores scoring and correction evidence omitted by workflow progress events.</summary>
+    internal async Task<AssociationNotification?> TranslateAsync(
+        PublishedAssociationEvent published,
+        bool requireConsecutive,
+        CancellationToken cancellationToken,
+        AssociationProjectionHandler? fallback = null)
+    {
+        AssociationNotification? complete = AssociationProjectionTranslator.TryCreateNotification(published);
+        if (complete is not null || !AssociationProjectionTranslator.IsSparsePropagation(published)
+            || published.Domain != ChatBotEventStore.DomainName || published.SequenceNumber <= 0
+            || string.IsNullOrWhiteSpace(published.TenantId) || string.IsNullOrWhiteSpace(published.AggregateId)
+            || string.IsNullOrWhiteSpace(published.IntakeId) || string.IsNullOrWhiteSpace(published.CorrectionId)
+            || string.IsNullOrWhiteSpace(published.WorkflowInstanceId))
+        {
+            return complete;
+        }
+
+        AssociationCandidateView? existing = await _store.GetAsync(published.TenantId, published.AggregateId, cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is null && fallback is not null)
+        {
+            existing = await fallback._store.GetAsync(published.TenantId, published.AggregateId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (existing is null || (requireConsecutive && published.SequenceNumber - existing.SourceVersion > 1))
+        {
+            // A retry can see the prerequisite revision after the subscription or SDK projects it.
+            throw new InvalidOperationException("The association correction projection has not reached the preceding revision.");
+        }
+
+        if (existing.IntakeId != published.IntakeId || existing.SourceMailboxId != published.SourceMailboxId
+            || existing.SourceConversationId != published.SourceConversationId
+            || existing.PriorProjectId is null || existing.PriorProjectId != published.PriorProjectId
+            || existing.CorrectedProjectId is null || existing.CorrectedProjectId != published.CorrectedProjectId
+            || (existing.CorrectionId is not null && existing.CorrectionId != published.CorrectionId)
+            || (existing.WorkflowInstanceId is not null && existing.WorkflowInstanceId != published.WorkflowInstanceId))
+        {
+            return null;
+        }
+
+        return AssociationProjectionTranslator.TryCreateNotification(published with
+        {
+            SourceThreadId = existing.SourceThreadId,
+            ProjectId = existing.ProjectId,
+            ProjectDisplayName = existing.ProjectDisplayName,
+            Candidates = existing.Candidates,
+            Exclusions = existing.Exclusions,
+            ConfidenceScore = existing.ConfidenceScore,
+            ThresholdBand = existing.ThresholdBand,
+            Outcome = existing.Outcome,
+            ThresholdPolicyVersion = existing.ThresholdPolicyVersion,
+            DerivationKernelVersion = existing.DerivationKernelVersion,
+            DetectedAt = existing.DetectedAt,
+            DecisionKind = existing.DecisionKind,
+            ActorId = existing.DecisionActorId,
+            ActorType = existing.DecisionActorType,
+            DecidedAt = existing.DecidedAt,
+            DecisionNote = existing.DecisionNote,
+            DecisionNoteRedactionState = existing.DecisionNoteRedactionState,
+            SurfaceOrigin = existing.SurfaceOrigin,
+            PolicySnapshotVersion = existing.PolicySnapshotVersion,
+            CorrectionKind = existing.CorrectionKind,
+            PredecessorAssociationId = existing.PredecessorAssociationId,
+            SupersedesAssociationId = existing.SupersedesAssociationId,
+            SupersededByAssociationId = existing.SupersededByAssociationId,
+            CorrectionRationale = existing.CorrectionRationale,
+            CorrectionRationaleRedactionState = existing.CorrectionRationaleRedactionState,
+            CorrectionActorId = existing.CorrectionActorId,
+            CorrectionActorType = existing.CorrectionActorType,
+            CorrectedAt = existing.CorrectedAt,
+        });
+    }
+
     public Task<ProjectionOutcome> HandleAsync(
         AssociationNotification notification,
         CancellationToken cancellationToken = default)
@@ -61,7 +139,10 @@ internal sealed class AssociationProjectionHandler
             return ProjectionOutcome.Ignored;
         }
 
-        PropagationProjectionState propagation = PropagationProjectionState.Merge(existing, notification);
+        bool startsNewCorrection = notification.PropagationStatus == Association.CorrectionPropagationStatuses.Pending
+            && (existing is null || existing.SourceVersion < notification.SourceVersion);
+        AssociationCandidateView? priorPropagation = startsNewCorrection ? null : existing;
+        PropagationProjectionState propagation = PropagationProjectionState.Merge(priorPropagation, notification);
 
         AssociationCandidateView view = new(
             notification.TenantId,
@@ -108,8 +189,8 @@ internal sealed class AssociationProjectionHandler
             notification.CorrectionActorType,
             notification.CorrectedAt,
             notification.DownstreamImpactStatus ?? existing?.DownstreamImpactStatus,
-            notification.CorrectionId ?? existing?.CorrectionId,
-            notification.WorkflowInstanceId ?? existing?.WorkflowInstanceId,
+            notification.CorrectionId ?? priorPropagation?.CorrectionId,
+            notification.WorkflowInstanceId ?? priorPropagation?.WorkflowInstanceId,
             propagation.RequiredStoreKeys,
             propagation.CompletedStoreKeys,
             propagation.FailedStoreKeys,
@@ -120,8 +201,8 @@ internal sealed class AssociationProjectionHandler
             propagation.EstimatedCompletionAtUtc,
             propagation.PropagationStatus,
             propagation.IsCorrectedContextStale,
-            notification.ResponsibleOwnerRole ?? existing?.ResponsibleOwnerRole,
-            notification.SafeNextAction ?? existing?.SafeNextAction,
+            notification.ResponsibleOwnerRole ?? priorPropagation?.ResponsibleOwnerRole,
+            notification.SafeNextAction ?? priorPropagation?.SafeNextAction,
             notification.ExternalSender ?? existing?.ExternalSender,
             notification.StrictnessPolicy ?? existing?.StrictnessPolicy,
             notification.RoutingReason ?? existing?.RoutingReason);
@@ -301,8 +382,10 @@ internal sealed class AssociationProjectionHandler
             }
 
             string[] required = MergeKeys(existing?.RequiredStoreKeys, notification.RequiredStoreKeys);
-            string[] completed = MergeKeys(existing?.CompletedStoreKeys, notification.CompletedStoreKeys);
-            string[] failed = MergeKeys(existing?.FailedStoreKeys, notification.FailedStoreKeys);
+            string[] completed = MergeKeys(existing?.CompletedStoreKeys, notification.CompletedStoreKeys)
+                .Except(notification.FailedStoreKeys ?? [], StringComparer.Ordinal).ToArray();
+            string[] failed = MergeKeys(existing?.FailedStoreKeys, notification.FailedStoreKeys)
+                .Except(notification.CompletedStoreKeys ?? [], StringComparer.Ordinal).ToArray();
             int denominator = notification.PropagationProgressDenominator is > 0
                 ? notification.PropagationProgressDenominator.Value
                 : required.Length > 0
@@ -310,9 +393,7 @@ internal sealed class AssociationProjectionHandler
                     : existing?.PropagationProgressDenominator ?? 0;
             int numerator = notification.PropagationProgressNumerator is > 0
                 ? Math.Max(notification.PropagationProgressNumerator.Value, completed.Length)
-                : completed.Length > 0
-                    ? completed.Length
-                    : existing?.PropagationProgressNumerator ?? 0;
+                : completed.Length;
 
             return new PropagationProjectionState(
                 required,

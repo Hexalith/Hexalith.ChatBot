@@ -243,9 +243,13 @@ internal static partial class ChatBotProjectionFanOutEndpoints
                     intake.Captured, intake.TenantId, intake.SourceVersion, intake.CorrelationId, runSideEffects: false, cancellationToken)
                     .ConfigureAwait(false);
                 return Results.Ok();
-            case PublishedAssociationEvent association when AssociationProjectionTranslator.TryCreateNotification(association) is { } notification:
-                _ = await Service<AssociationProjectionHandler>(context).HandleAsync(
-                    notification, runSideEffects: false, cancellationToken).ConfigureAwait(false);
+            case PublishedAssociationEvent association:
+                AssociationProjectionHandler handler = Service<AssociationProjectionHandler>(context);
+                if (await handler.TranslateAsync(association, requireConsecutive: true, cancellationToken).ConfigureAwait(false)
+                    is { } notification)
+                {
+                    _ = await handler.HandleAsync(notification, runSideEffects: false, cancellationToken).ConfigureAwait(false);
+                }
                 return Results.Ok();
             case PublishedParticipantResolutionEvent participant:
                 return await ParticipantResolutionProjectionEndpoints.ProjectAsync(
