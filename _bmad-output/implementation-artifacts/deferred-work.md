@@ -1106,6 +1106,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Two review patches need NEW test code and were not written because the solution cannot compile — a behavioral guard for the `KeycloakPersistent` stderr warning, and a test asserting the dead-letter drain's DAPR subscription metadata (`/dapr/subscribe` or `ITopicMetadata`).
   evidence: Both are verified-real medium findings routed to patch. Writing test code that cannot be compiled or run was judged worse than recording them, consistent with the same decision taken for the matrix row 8 gap. Close both in the pass that re-runs the blocked suites once `references/Hexalith.Folders` and the AppHost `WithEventStoreClientCredentials` break are resolved.
+  resolution: Resolved 2026-11-25. The real AppHost testing builder emitted one grant-expiry warning with Keycloak persistence enabled and none with it disabled. Both cases passed, and the existing fan-out subscription discovery test covers the dead-letter metadata.
 
 ## Deferred from: review of spec-fix-generated-idempotency-helper-non-nullable-enum (2026-09-17)
 

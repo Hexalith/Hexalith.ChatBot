@@ -1054,6 +1054,34 @@ public sealed class RecoveryValidationTopologyContractTests
         }
     }
 
+    /// <summary>Captures the real AppHost warning for enabled and disabled Keycloak persistence.</summary>
+    [Theory]
+    [InlineData("true", 1)]
+    [InlineData("false", 0)]
+    public async Task AppHostWarnsAboutGrantExpiryOnlyForPersistentKeycloak(string persistent, int expectedWarnings)
+    {
+        // This class's non-parallel collection protects the process-wide stderr writer.
+        using StringWriter captured = new(CultureInfo.InvariantCulture);
+        TextWriter originalError = Console.Error;
+        try
+        {
+            Console.SetError(captured);
+            IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(
+                    [.. RenderedRealmArgs, $"--KeycloakPersistent={persistent}"], TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+
+        captured.ToString().Split(Environment.NewLine)
+            .Count(line => line.Contains("service-client grant expiry validated here", StringComparison.Ordinal))
+            .ShouldBe(expectedWarnings);
+    }
+
     /// <summary>
     /// A realm client whose grant-expiry mapper lost its substitution placeholder must fail AppHost startup naming
     /// that client, rather than reporting a placeholder count the operator then has to trace back to a client.
