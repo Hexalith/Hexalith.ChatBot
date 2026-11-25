@@ -637,10 +637,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     }
 
     /// <summary>Proves fresh-state grant and note refusal through production admission without durable effects.</summary>
-    internal async Task RunGovernedCommandRefusalAsync()
+    internal async Task RunGovernedCommandRefusalAsync(CancellationToken cancellationToken)
     {
         RequireTier3Runtime("The production refusal smoke requires HEXALITH_CHATBOT_TIER3=1, Docker and DAPR.");
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         const string tenantId = "tenant-alpha";
         const string principalId = "actor-alpha";
         string noteId = GovernedNoteId.New().ToString();
@@ -846,14 +845,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     /// Requires committed two-tenant governed state before testing the M2 stop-ship sweeps. Release selects this
     /// independently of the refusal smoke; accepted production atomic participation remains required.
     /// </summary>
-    internal async Task RunCommittedGovernedStateM2GateAsync()
+    internal async Task RunCommittedGovernedStateM2GateAsync(CancellationToken cancellationToken)
     {
         RequireTier3Runtime(
             "Tier-3 Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to run it; the test mints its own tenant-bound "
             + "Keycloak token from the provisioned realm.");
-
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
         // Fresh, valid ULIDs PER RUN so the durable state of an earlier (possibly failed) topology run in Redis
         // cannot dedup/poison this run: EventStore caches a command outcome keyed by command/causation id, so a
@@ -1139,7 +1136,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             $"The M2 release gate never cleared within its deadline. Last status: {lastStatus}. Last body: {lastBody}");
     }
 
-    internal async Task RunGovernedNoteOriginParityAsync()
+    internal async Task RunGovernedNoteOriginParityAsync(CancellationToken cancellationToken)
     {
         // Stretch leg (AC7): the live cross-origin differential. The same semantic intent submitted with
         // origin=ui then origin=cli then origin=mcp against the REAL DAPR topology must materialise an identical
@@ -1150,7 +1147,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to run it; the Tier-2 in-process arms cover "
             + "AC1-AC6 without it.");
 
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         string correlationId = ChatBotCommandId.New().ToString();
 
         DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
@@ -1223,13 +1219,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
-    internal async Task RunCorrectionPropagationRuntimeHealthAsync()
+    internal async Task RunCorrectionPropagationRuntimeHealthAsync(CancellationToken cancellationToken)
     {
         RequireTier3Runtime(
             "Tier-3 workflow smoke requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to validate the hosted workflow runtime.");
 
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {

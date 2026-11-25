@@ -81,7 +81,8 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
 
     [Fact]
     public Task AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix()
-        => RunAuthenticatedProductionClientMatrixAsync();
+        => new TopologyTestDeadline().RunAsync(RunAuthenticatedProductionClientMatrixAsync,
+            TestContext.Current.CancellationToken);
 
     [Theory]
     [InlineData(null, false)]
@@ -93,13 +94,12 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         bool expected)
         => IsSubmissionFailureMarker(submissionError).ShouldBe(expected);
 
-    internal async Task RunAuthenticatedProductionClientMatrixAsync()
+    internal async Task RunAuthenticatedProductionClientMatrixAsync(CancellationToken cancellationToken)
     {
         TrivialGovernedCommandAspireE2eTests.RequireTier3Runtime(
             "Story 13.2 production-browser acceptance requires HEXALITH_CHATBOT_TIER3=1, Docker, DAPR, and Chrome.");
         using IPlaywright playwright = await Playwright.CreateAsync().ConfigureAwait(true);
         string chromeExecutable = RequireChromeExecutable(playwright);
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         DistributedApplication app = await TrivialGovernedCommandAspireE2eTests.StartTestingApplicationAsync(
             output,
             cancellationToken,
@@ -172,6 +172,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             BrowserMatrix.Length.ShouldBe(24);
             foreach (BrowserMatrixRow row in BrowserMatrix)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 await page.SetViewportSizeAsync(row.Width, row.Height).ConfigureAwait(true);
                 await page.EmulateMediaAsync(new PageEmulateMediaOptions
                 {

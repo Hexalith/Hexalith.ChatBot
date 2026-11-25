@@ -1097,6 +1097,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Waits outside the new shared topology budget (`StartupTimeout` 3 min, `SelectedResourceValidationTimeout` 5 min, the 6-minute M2 gate deadline) can still accumulate past the job's `timeout-minutes: 30`.
   evidence: Verified present in `TrivialGovernedCommandAspireE2eTests.cs:92,98,331`. Pre-existing and outside the recorded 2026-09-13 intent, which targeted the seven 5-minute resource-health waits specifically. A whole-test deadline would settle it.
+  resolution: Resolved 2026-11-25. The required live and release tests share a 25-minute lane budget, including startup and the browser matrix. Linked cancellation propagates through nested work, and teardown is awaited for diagnostics. Deadline tests cover cancellation, cleanup, and refusing another test after the shared budget expires.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: `accesscontrol.local.yaml` — the only access-control file the repo actually exercises — has no conformance guard that it stays policy-free and local-only.
   evidence: Its entire coverage is two `ShouldContain` strings in `ScaffoldTopologySmokeTests.cs:39-40`. Pre-existing; the production-file guards added by this story deliberately did not extend to it.
