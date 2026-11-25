@@ -20,6 +20,50 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 public sealed partial class CommandGatewayTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OriginalAcceptanceShouldPreserveWorkflowAndDuplicateOutputsAlreadyRecordedByReplay(bool sdk)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        MutableClock clock = new(FixedClock.FixedUtcNow);
+        DelayedInitialOperationStatusStore status = new(failInitialWrite: false, sdk);
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, operationStatusStore: status,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), MailboxCommand(),
+            origin: Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin.Mailbox);
+
+        Task<ChatBotGatewayResult> original = gateway.SubmitAsync(submission, token).AsTask();
+        OperationStatusRecord terminal;
+        try
+        {
+            await status.FirstWriteEntered.WaitAsync(TimeSpan.FromSeconds(5), token);
+            CommandSubmissionResponse receipt = (await gateway.SubmitAsync(submission, token)).Accepted.ShouldNotBeNull();
+            OperationStatusWorkflowStatusSink sink = new(status, clock);
+            await sink.ReportAsync(WorkflowRequest(receipt), CorrectionPropagationWorkflowStatuses.Completed, 3, null, token);
+            terminal = (await status.TryGetAsync(BoundTenant, receipt.OperationId, token)).ShouldNotBeNull();
+            terminal.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+        }
+        finally
+        {
+            status.ReleaseFirstWrite();
+        }
+
+        (await original.ConfigureAwait(true)).IsAccepted.ShouldBeTrue();
+        OperationStatusRecord stored = (await status.TryGetAsync(BoundTenant, terminal.OperationId, token)).ShouldNotBeNull();
+        stored.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
+        stored.CompletionStatus.ShouldBe(OperationStatusRecord.Completed);
+        stored.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        stored.WorkflowRetryCount.ShouldBe(3);
+        stored.ReasonCode.ShouldBe(terminal.ReasonCode);
+        stored.SafeNextActions.ShouldBe(terminal.SafeNextActions);
+        stored.PartialOutputCodes.ShouldBe(["duplicate_suppressed"]);
+        stored.DuplicateAttemptCount.ShouldBe(1);
+        AssertPreparedOutcome(stored.PriorOutcome.ShouldNotBeNull(), terminal.PriorOutcome.ShouldNotBeNull());
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

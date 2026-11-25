@@ -19,6 +19,17 @@ internal static class OperationStatusUpdatePolicy
         return Apply(current, incoming);
     }
 
+    /// <summary>Merges acceptance proof into status already initialized by a replay.</summary>
+    public static OperationStatusRecord MergeAcceptance(OperationStatusRecord? current, OperationStatusRecord receipt)
+    {
+        OperationStatusRecord validated = Apply(current, receipt);
+        return current is null ? validated : current with
+        {
+            AuditStatus = validated.AuditStatus,
+            LastUpdatedAt = current.LastUpdatedAt < receipt.LastUpdatedAt ? receipt.LastUpdatedAt : current.LastUpdatedAt,
+        };
+    }
+
     /// <summary>Preserves immutable identity and monotonic canonical state; rejects conflicting equal revisions.</summary>
     public static OperationStatusRecord Apply(OperationStatusRecord? current, OperationStatusRecord incoming)
     {

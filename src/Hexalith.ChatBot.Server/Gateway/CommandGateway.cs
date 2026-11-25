@@ -295,15 +295,11 @@ internal sealed class CommandGateway(
 
         try
         {
+            OperationStatusRecord receiptStatus = OperationStatusRecord.Accepted(
+                context.TenantBinding.TenantId, response, !postCommitAudit.Succeeded, clock.UtcNow, idempotency.OperationClass);
             await operationStatusStore
-                .UpsertAsync(
-                    OperationStatusRecord.Accepted(
-                        context.TenantBinding.TenantId,
-                        response,
-                        !postCommitAudit.Succeeded,
-                        clock.UtcNow,
-                        idempotency.OperationClass),
-                    cancellationToken)
+                .UpdateAsync(receiptStatus.TenantId, receiptStatus.OperationId,
+                    current => OperationStatusUpdatePolicy.MergeAcceptance(current, receiptStatus), cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)

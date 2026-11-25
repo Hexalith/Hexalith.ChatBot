@@ -1,10 +1,13 @@
 using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Tests.Gateway.Status;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
-internal sealed class DelayedInitialOperationStatusStore(bool failInitialWrite) : IOperationStatusStore
+internal sealed class DelayedInitialOperationStatusStore(bool failInitialWrite, bool sdk = false) : IOperationStatusStore
 {
-    private readonly InMemoryOperationStatusStore _inner = new();
+    private readonly IOperationStatusStore _inner = sdk
+        ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore())
+        : new InMemoryOperationStatusStore();
     private readonly TaskCompletionSource _firstWriteEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _releaseFirstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _writes;
@@ -13,7 +16,11 @@ internal sealed class DelayedInitialOperationStatusStore(bool failInitialWrite) 
 
     public void ReleaseFirstWrite() => _releaseFirstWrite.TrySetResult();
 
-    public async ValueTask UpsertAsync(OperationStatusRecord record, CancellationToken cancellationToken)
+    public ValueTask UpsertAsync(OperationStatusRecord record, CancellationToken cancellationToken)
+        => _inner.UpsertAsync(record, cancellationToken);
+
+    public async ValueTask UpdateAsync(string tenantId, string operationId,
+        Func<OperationStatusRecord?, OperationStatusRecord?> update, CancellationToken cancellationToken)
     {
         if (Interlocked.Increment(ref _writes) == 1)
         {
@@ -24,13 +31,10 @@ internal sealed class DelayedInitialOperationStatusStore(bool failInitialWrite) 
                 throw new InvalidOperationException("Injected initial status write failure.");
             }
         }
-        await _inner.UpsertAsync(record, cancellationToken).ConfigureAwait(false);
+        await _inner.UpdateAsync(tenantId, operationId, update, cancellationToken).ConfigureAwait(false);
     }
 
     public ValueTask<OperationStatusRecord?> TryGetAsync(string tenantId, string operationId, CancellationToken cancellationToken)
         => _inner.TryGetAsync(tenantId, operationId, cancellationToken);
 
-    public ValueTask UpdateAsync(string tenantId, string operationId,
-        Func<OperationStatusRecord?, OperationStatusRecord?> update, CancellationToken cancellationToken)
-        => _inner.UpdateAsync(tenantId, operationId, update, cancellationToken);
 }

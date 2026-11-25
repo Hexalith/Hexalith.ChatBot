@@ -1574,6 +1574,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: Preserve workflow progress and duplicate partial-output facts when a delayed original acceptance receipt arrives after replay initialized the operation status.
   evidence: R8B1 (medium), pre-existing at the original blind-replacement baseline. A replay-created status can receive a completed workflow report before the original gateway finishes its post-commit audit; `CommandGateway` then upserts a fresh `Accepted` record. Equal/later LastUpdatedAt selects that receipt in the unchanged legacy policy, which preserves audit/count/prior outcome but clears workflow completion/guidance and partial outputs. This is separate from early reports discarded before any record exists (Story 1.2 Loop 15 BH3) and from the now-atomic replay/sink mutations. Resolve with a receipt-initialization/field-merge lifecycle decision and a deterministic replay-created → workflow-completed → original-receipt final-state regression through both stores, retaining receipt-proven audit certainty and historical identity.
+  resolution: Resolved 2026-11-25. Receipt publication merges audit proof atomically while preserving workflow completion and duplicate output from replay. The regression passed against both operation-status stores.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-20, round 27)
 
