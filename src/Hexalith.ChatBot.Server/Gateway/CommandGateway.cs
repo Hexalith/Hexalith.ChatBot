@@ -266,7 +266,17 @@ internal sealed class CommandGateway(
         }
 
         AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult with { AcceptedAt = response.AcceptedAt }, transition, clock.UtcNow);
-        AuditWriteResult postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
+        AuditWriteResult postCommitAudit;
+        try
+        {
+            postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            postCommitAudit = AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed);
+        }
+
         if (!postCommitAudit.Succeeded)
         {
             await QueueReplayIntentAsync(
@@ -283,16 +293,26 @@ internal sealed class CommandGateway(
                 .ConfigureAwait(false);
         }
 
-        await operationStatusStore
-            .UpsertAsync(
-                OperationStatusRecord.Accepted(
-                    context.TenantBinding.TenantId,
-                    response,
-                    !postCommitAudit.Succeeded,
-                    clock.UtcNow,
-                    idempotency.OperationClass),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await operationStatusStore
+                .UpsertAsync(
+                    OperationStatusRecord.Accepted(
+                        context.TenantBinding.TenantId,
+                        response,
+                        !postCommitAudit.Succeeded,
+                        clock.UtcNow,
+                        idempotency.OperationClass),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // The receipt is already durable. A same-ID replay can initialize the missing read model.
+            await AlertAsync(OperatorAlertKind.DependencyDegraded, postCommitEnvelope, "operation_status_unavailable", cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return ChatBotGatewayResult.AcceptedResult(response, !postCommitAudit.Succeeded);
     }
@@ -401,8 +421,9 @@ internal sealed class CommandGateway(
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Operational notification is advisory; durable reservation ownership remains authoritative.
         }
     }
@@ -427,8 +448,9 @@ internal sealed class CommandGateway(
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Operational notification is advisory; durable reservation ownership remains authoritative.
         }
     }

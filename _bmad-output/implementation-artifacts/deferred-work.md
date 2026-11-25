@@ -1138,6 +1138,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: After a durable receipt, a thrown post-commit audit write or operation-status upsert escapes `CommandGateway.SubmitAsync` as a raw 500 for a committed command.
   evidence: Loop 16 findings 12/45 (medium), pre-existing; carried in the spec triage log since Loop 7 BH8 (Loops 13 BH3, 14 BH8, 15 BH6) but never recorded in this ledger. `CommandGateway.cs:228-255` matches baseline apart from the `AcceptedAt` copy. Same-ID retries replay the stored receipt; fresh-ID `SubmitAsync` retries of generic commands re-dispatch.
+  resolution: Resolved 2026-11-25. After the durable receipt, an audit exception queues reconciliation and a failed status write raises a metadata-only dependency alert. The caller still receives acceptance, and replay restores missing status from the same receipt without dispatching again. Nine focused gateway cases passed, covering caller cancellation and independent task cancellation at both dependencies.
 ### DW-143: Valid enum-keyed dictionary maps (e.g. `TenantPolicyValue.AiActionLowRiskAllowed`) pass request validation but cannot deserialize because `JsonEnumMemberStringConverter` lacks dictionary-key support, so authorization denies them with 403.
 
 status: done 2026-11-24

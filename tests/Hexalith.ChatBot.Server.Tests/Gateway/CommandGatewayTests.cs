@@ -3414,12 +3414,21 @@ public sealed partial class CommandGatewayTests
         Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
     }
 
-    [Fact]
-    public async Task PostCommitAuditFailureShouldQueueReconciliationAndKeepDispatchAccepted()
+    [Theory]
+    [InlineData("unavailable")]
+    [InlineData("exception")]
+    [InlineData("dependency-canceled")]
+    public async Task PostCommitAuditFailureShouldQueueReconciliationAndKeepDispatchAccepted(string failure)
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new()
         {
+            OnPostCommit = failure switch
+            {
+                "exception" => () => throw new IOException("sensitive-dependency-detail"),
+                "dependency-canceled" => () => throw new TaskCanceledException("sensitive-dependency-detail", innerException: null, new CancellationToken(canceled: true)),
+                _ => null,
+            },
             PostCommitResult = AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed),
         };
         RecordingReplayIntentQueue replayQueue = new();
@@ -3434,6 +3443,7 @@ public sealed partial class CommandGatewayTests
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
             TestContext.Current.CancellationToken);
 
+        TestContext.Current.CancellationToken.IsCancellationRequested.ShouldBeFalse();
         result.IsAccepted.ShouldBeTrue();
         result.AuditReconciliationRequired.ShouldBeTrue();
         dispatcher.DispatchCount.ShouldBe(1);
@@ -3444,6 +3454,72 @@ public sealed partial class CommandGatewayTests
         alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.PostCommitAuditReconciliationRequired);
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task PostCommitStatusWriteFailureShouldKeepReceiptAndAllowReplayToRestoreStatus(bool auditThrows, bool statusCanceled)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        RecordingDispatcher dispatcher = new();
+        RecordingOperatorAlertSink alerts = new();
+        RecordingReplayIntentQueue queue = new();
+        FaultingGatewayOperationStatusStore status = new(() => throw (statusCanceled
+            ? new TaskCanceledException("sensitive-status-detail", innerException: null, new CancellationToken(canceled: true))
+            : new IOException("sensitive-status-detail")));
+        RecordingAuditWriter audit = new()
+        {
+            OnPostCommit = auditThrows ? () => throw new IOException("sensitive-audit-detail") : null,
+        };
+        CommandGateway gateway = Gateway(dispatcher, auditWriter: audit, alertSink: alerts, replayQueue: queue, operationStatusStore: status);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(submission, token);
+        token.IsCancellationRequested.ShouldBeFalse();
+        first.IsAccepted.ShouldBeTrue();
+        first.AuditReconciliationRequired.ShouldBe(auditThrows);
+        (await status.TryGetAsync(BoundTenant, first.Accepted!.OperationId!, token)).ShouldBeNull();
+        OperatorAlert statusAlert = alerts.Alerts.Where(alert => alert.Kind == OperatorAlertKind.DependencyDegraded).ShouldHaveSingleItem();
+        statusAlert.ReasonCode.ShouldBe("operation_status_unavailable");
+        queue.Intents.Count.ShouldBe(auditThrows ? 1 : 0);
+
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(submission, token);
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted!.OperationId.ShouldBe(first.Accepted.OperationId);
+        dispatcher.DispatchCount.ShouldBe(1);
+        OperationStatusRecord restored = (await status.TryGetAsync(BoundTenant, first.Accepted.OperationId!, token)).ShouldNotBeNull();
+        restored.CommandId.ShouldBe(first.Accepted.CommandId);
+        restored.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PostCommitDependencyShouldPreserveCallerCancellation(bool cancelDuringAudit)
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        void Cancel()
+        {
+            caller.Cancel();
+            caller.Token.ThrowIfCancellationRequested();
+        }
+
+        RecordingDispatcher dispatcher = new();
+        RecordingOperatorAlertSink alerts = new();
+        RecordingAuditWriter audit = new() { OnPostCommit = cancelDuringAudit ? Cancel : null };
+        FaultingGatewayOperationStatusStore status = new(Cancel);
+        CommandGateway gateway = Gateway(dispatcher, auditWriter: audit, alertSink: alerts, operationStatusStore: status);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
+
+        await Should.ThrowAsync<OperationCanceledException>(() => gateway.SubmitAsync(submission, caller.Token).AsTask());
+        dispatcher.DispatchCount.ShouldBe(1);
+        alerts.Alerts.ShouldBeEmpty();
+
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        replay.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
     }
 
     [Fact]
@@ -7129,6 +7205,7 @@ public sealed partial class CommandGatewayTests
         public bool ThrowPreCommit { get; init; }
 
         public Action? OnPreCommit { get; init; }
+        public Action? OnPostCommit { get; init; }
         public Action? OnAuthorizationFailure { get; set; }
 
         public AuditWriteResult PreCommitResult { get; init; } = AuditWriteResult.Success;
@@ -7159,6 +7236,7 @@ public sealed partial class CommandGatewayTests
         {
             Envelopes.Add(envelope);
             stages?.Add("post-commit-audit");
+            OnPostCommit?.Invoke();
             return ValueTask.FromResult(PostCommitResult);
         }
     }
