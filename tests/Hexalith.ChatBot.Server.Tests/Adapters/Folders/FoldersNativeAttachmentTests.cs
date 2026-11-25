@@ -10,6 +10,7 @@ using Hexalith.Folders.Projections.TenantAccess;
 using FoldersServerModule = FoldersOwner::Hexalith.Folders.Server.FoldersServerModule;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.TestHost;
+using Newtonsoft.Json.Linq;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Adapters.Folders;
@@ -227,37 +228,49 @@ public sealed class FoldersNativeAttachmentTests
         (await fixture.StateAsync().ConfigureAwait(true)).WorkspaceLockFence.ShouldBe(2);
         (await fixture.BindingsAsync().ConfigureAwait(true)).Count.ShouldBe(1);
     }
-    [Fact]
-    public async Task NativeLeaseRenewsAtTheTighterTenantBoundaryWithAControlledTimer()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task NativeLeaseObservesTheTighterTenantBoundaryDuringUpload(bool renew)
     {
         var request = Request(); var fixture = await FixtureAsync(request).ConfigureAwait(true);
         await using var cleanup = fixture.ConfigureAwait(true);
-        foreach (var pair in new Dictionary<string, int> { ["RenewalIntervalSeconds"] = 10, ["AuthorizationIntervalSeconds"] = 15,
+        foreach (var pair in new Dictionary<string, int> { ["RenewalIntervalSeconds"] = renew ? 10 : 30, ["AuthorizationIntervalSeconds"] = 15,
             ["RevocationEffectSeconds"] = 60, ["ExpiredToStaleSeconds"] = 60 }) fixture.App.Configuration["Folders:NativeLease:" + pair.Key] = pair.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var uploading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var renewed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.Gateway.AfterAppend = command =>
-        {
-            if (command.CommandType == FoldersServerModule.NativeTaskCommandType && command.Payload.GetProperty("request").GetProperty("operation").GetString() == "renew") renewed.TrySetResult();
-            return Task.CompletedTask;
-        };
+        var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        string observation = renew ? "renew" : "validate";
         NativeAttachmentTestHandler handler = null!;
         handler = new NativeAttachmentTestHandler(async (message, token) =>
         {
-            if (message.RequestUri!.AbsolutePath.EndsWith("/native/files/add", StringComparison.Ordinal))
+            string path = message.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/native/files/add", StringComparison.Ordinal))
             { uploading.TrySetResult(); await release.Task.WaitAsync(token).ConfigureAwait(true); }
-            return await handler!.ForwardAsync(message, token).ConfigureAwait(true);
+
+            bool observesLease = path.EndsWith("/native/task-lease", StringComparison.Ordinal) &&
+                (string?)JObject.Parse(await message.Content!.ReadAsStringAsync(token).ConfigureAwait(true))["operation"] == observation;
+            HttpResponseMessage response = await handler.ForwardAsync(message, token).ConfigureAwait(true);
+            if (observesLease && response.IsSuccessStatusCode)
+            {
+                observed.TrySetResult();
+            }
+            return response;
         }) { InnerHandler = fixture.App.GetTestServer().CreateHandler() };
         using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-        var store = new FoldersFolderStore(new NativeClient(http), "tenant-a", fixture.Clock);
-        var operation = store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken).AsTask();
-        await uploading.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        fixture.Clock.Advance(TimeSpan.FromSeconds(10));
-        await renewed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).ConfigureAwait(true);
-        (await fixture.StateAsync().ConfigureAwait(true)).WorkspaceLockEffectiveAt.ShouldBe(fixture.Clock.Now);
+        var observationClock = new LeaseObservationTestClock(fixture.Clock);
+        var store = new FoldersFolderStore(new NativeClient(http), "tenant-a", observationClock);
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        TimeSpan deadline = TimeSpan.FromSeconds(5);
+        var operation = store.StoreMailboxAttachmentAsync(request, cancellationToken).AsTask();
+        await uploading.Task.WaitAsync(deadline, cancellationToken).ConfigureAwait(true);
+        DateTimeOffset acquiredAt = fixture.Clock.Now;
+        fixture.Clock.Advance(TimeSpan.FromSeconds(renew ? 10 : 15));
+        await observed.Task.WaitAsync(deadline, cancellationToken).ConfigureAwait(true);
+        await observationClock.NextObservationScheduled.WaitAsync(deadline, cancellationToken).ConfigureAwait(true);
+        (await fixture.StateAsync().ConfigureAwait(true)).WorkspaceLockEffectiveAt.ShouldBe(renew ? fixture.Clock.Now : acquiredAt);
         release.TrySetResult();
-        (await operation.ConfigureAwait(true)).Stored.ShouldNotBeNull();
+        (await operation.WaitAsync(deadline, cancellationToken).ConfigureAwait(true)).Stored.ShouldNotBeNull();
         (await fixture.StateAsync().ConfigureAwait(true)).WorkspaceLockFence.ShouldBe(1);
     }
     [Theory]
@@ -290,6 +303,132 @@ public sealed class FoldersNativeAttachmentTests
         result.Stored.ShouldBeNull(); result.Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_store_retryable");
         fixture.Gateway.Mutations.ShouldBe(0); (await fixture.StateAsync().ConfigureAwait(true)).ContentPublications.ShouldBeEmpty();
     }
+    /// <summary>Malformed lease observations cancel work and release the last valid owner fence.</summary>
+    [Theory]
+    [InlineData("renew", "renewalIntervalSeconds")]
+    [InlineData("renew", "expiresAt")]
+    [InlineData("renew", "lockFence")]
+    [InlineData("renew", "unchangedWindow")]
+    [InlineData("renew", "backdatedWindow")]
+    [InlineData("acquire", "renewalIntervalSeconds")]
+    [InlineData("validate", "effectiveAt")]
+    [InlineData("validate", "lockId")]
+    [InlineData("validate", "ownershipProof")]
+    [InlineData("validate", "authorizationIntervalSeconds")]
+    public async Task MalformedNativeLeaseObservationPreservesTheLastValidFence(string operation, string field)
+    {
+        var request = Request();
+        var fixture = await FixtureAsync(request).ConfigureAwait(true);
+        await using var cleanup = fixture.ConfigureAwait(true);
+        fixture.App.Configuration["Folders:NativeLease:RenewalIntervalSeconds"] = operation == "renew" ? "10" : "30";
+        fixture.App.Configuration["Folders:NativeLease:AuthorizationIntervalSeconds"] = "15";
+        fixture.App.Configuration["Folders:NativeLease:RevocationEffectSeconds"] = "60";
+        fixture.App.Configuration["Folders:NativeLease:ExpiredToStaleSeconds"] = "60";
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        TimeSpan deadline = TimeSpan.FromSeconds(5);
+        TaskCompletionSource uploading = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        JObject? originalLease = null;
+        JObject? releaseRequest = null;
+        bool responseChanged = false;
+        NativeAttachmentTestHandler handler = null!;
+        handler = new NativeAttachmentTestHandler(async (message, token) =>
+        {
+            string path = message.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/native/files/add", StringComparison.Ordinal))
+            {
+                uploading.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, token).ConfigureAwait(true);
+            }
+
+            if (!path.EndsWith("/native/task-lease", StringComparison.Ordinal))
+            {
+                return await handler.ForwardAsync(message, token).ConfigureAwait(true);
+            }
+
+            JObject leaseRequest = JObject.Parse(await message.Content!.ReadAsStringAsync(token).ConfigureAwait(true));
+            string? action = (string?)leaseRequest["operation"];
+            if (action == "release")
+            {
+                releaseRequest = leaseRequest;
+                return await handler.ForwardAsync(message, token).ConfigureAwait(true);
+            }
+
+            HttpResponseMessage response = await handler.ForwardAsync(message, token).ConfigureAwait(true);
+            if (action == "acquire")
+            {
+                originalLease = JObject.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(true));
+            }
+
+            if (action != operation)
+            {
+                return response;
+            }
+
+            using (response)
+            {
+                response.EnsureSuccessStatusCode();
+                JObject changed = JObject.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(true));
+                if (field == "unchangedWindow")
+                {
+                    changed["effectiveAt"] = originalLease.ShouldNotBeNull()["effectiveAt"]!.DeepClone();
+                    changed["expiresAt"] = originalLease["expiresAt"]!.DeepClone();
+                }
+                else if (field == "backdatedWindow")
+                {
+                    DateTimeOffset backdated = fixture.Clock.Now.AddSeconds(-9);
+                    changed["effectiveAt"] = backdated;
+                    changed["expiresAt"] = backdated.AddSeconds(300);
+                }
+                else
+                {
+                    changed[field] = field switch
+                    {
+                        "effectiveAt" => fixture.Clock.Now.AddSeconds(-1),
+                        "expiresAt" => fixture.Clock.Now.AddSeconds(301),
+                        "lockFence" => 2,
+                        "lockId" => "invalid-lock",
+                        "ownershipProof" => "invalid-proof",
+                        _ => 0,
+                    };
+                }
+                responseChanged = true;
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(changed.ToString(), Encoding.UTF8, "application/json"),
+                };
+            }
+        }) { InnerHandler = fixture.App.GetTestServer().CreateHandler() };
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
+        var store = new FoldersFolderStore(new NativeClient(http), "tenant-a", fixture.Clock);
+        Task<MailboxAttachmentStorageResult> pending = store.StoreMailboxAttachmentAsync(request, cancellationToken).AsTask();
+        if (operation != "acquire")
+        {
+            await uploading.Task.WaitAsync(deadline, cancellationToken).ConfigureAwait(true);
+            fixture.Clock.Advance(TimeSpan.FromSeconds(operation == "renew" ? 10 : 15));
+        }
+        MailboxAttachmentStorageResult result = await pending.WaitAsync(deadline, cancellationToken).ConfigureAwait(true);
+
+        responseChanged.ShouldBeTrue();
+        result.Stored.ShouldBeNull();
+        if (operation == "acquire")
+        {
+            result.Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_write_evidence_unavailable");
+            uploading.Task.IsCompleted.ShouldBeFalse();
+        }
+        else
+        {
+            result.Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_store_retryable");
+        }
+        fixture.Gateway.Mutations.ShouldBe(0);
+        FolderState owner = await fixture.StateAsync().ConfigureAwait(true);
+        owner.ContentPublications.ShouldBeEmpty();
+        owner.WorkspaceLockHolderTaskId.ShouldBeNull();
+        foreach (string identity in new[] { "lockId", "ownershipProof", "lockFence" })
+        {
+            JToken.DeepEquals(releaseRequest.ShouldNotBeNull()[identity], originalLease.ShouldNotBeNull()[identity]).ShouldBeTrue();
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

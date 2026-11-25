@@ -8,6 +8,8 @@ namespace Hexalith.ChatBot.Server.Adapters.Folders;
 
 internal sealed partial class FoldersFolderStore
 {
+    private const int RequestedLeaseSeconds = 300;
+
     private readonly INativeClient? _native;
     private readonly string? _nativeTenant;
     private readonly TimeProvider _nativeClock = TimeProvider.System;
@@ -57,18 +59,21 @@ internal sealed partial class FoldersFolderStore
             if (prior.Status == NativeEvidenceTokens.Accepted) return await FinishAsync(prior, task, operation, key, work.Token).ConfigureAwait(false);
             if (prior.Status != "missing") return EvidenceUnavailable();
             if (confirmationOnly) return EvidenceUnavailable();
-            lease = await _native!.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
-                new NativeLeaseRequest { Operation = "acquire", RequestedLeaseSeconds = 300 }, work.Token).ConfigureAwait(false);
-            if (lease.LockFence <= 0 || string.IsNullOrWhiteSpace(lease.LockId) || string.IsNullOrWhiteSpace(lease.OwnershipProof)
-                || lease.EffectiveAt > _nativeClock.GetUtcNow() || lease.ExpiresAt <= _nativeClock.GetUtcNow()
-                || lease.RenewalIntervalSeconds is < 1 or > 30 || lease.AuthorizationIntervalSeconds is < 1 or > 15)
-                return EvidenceUnavailable();
+            NativeLease acquired = await _native!.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
+                new NativeLeaseRequest { Operation = "acquire", RequestedLeaseSeconds = RequestedLeaseSeconds }, work.Token).ConfigureAwait(false);
+            if (acquired is null || acquired.LockFence <= 0 || string.IsNullOrWhiteSpace(acquired.LockId) ||
+                string.IsNullOrWhiteSpace(acquired.OwnershipProof)) return EvidenceUnavailable();
+            // Retain the ownership proof for release even when the returned timing is unusable.
+            lease = acquired;
+            if (!IsUsableLeaseWindow(acquired, _nativeClock.GetUtcNow())) return EvidenceUnavailable();
+            long fence = acquired.LockFence;
             maintenance = CancellationTokenSource.CreateLinkedTokenSource(work.Token);
             maintain = MaintainAsync();
-            NativeEvidence oldAbsence = await QueryAsync(task, operation, legacyPath, key, true, "absence", lease.LockFence, work.Token).ConfigureAwait(false);
-            NativeEvidence absence = await QueryAsync(task, operation, path, key, false, "absence", lease.LockFence, work.Token).ConfigureAwait(false);
+            NativeEvidence oldAbsence = await QueryAsync(task, operation, legacyPath, key, true, "absence", fence, work.Token).ConfigureAwait(false);
+            NativeEvidence absence = await QueryAsync(task, operation, path, key, false, "absence", fence, work.Token).ConfigureAwait(false);
+            work.Token.ThrowIfCancellationRequested();
             if (oldAbsence.Status != "absent" || absence.Status != "absent" || absence.ExpectedFileVersion != 0
-                || absence.LockFence != lease.LockFence) return EvidenceUnavailable();
+                || absence.LockFence != fence) return EvidenceUnavailable();
             var mutation = FileUpload.BuildInlineFileMutation(request.Content.Content, media, path, operation,
                 FileMutationRequestFileOperationKind.Add, request.ContentType, hash, absence.ExpectedFileVersion, absence.LockFence);
             // Reuse SDK validation and canonical construction, then select the supported native v1 wire schema.
@@ -76,6 +81,7 @@ internal sealed partial class FoldersFolderStore
             NativeAcceptedCommand accepted = await _native.AddNativeFileAsync(folder, workspace, request.CorrelationId, task, key, body, work.Token).ConfigureAwait(false);
             NativeEvidence confirmed = await QueryAsync(task, operation, path, key, false, NativeEvidenceTokens.Accepted, 0, work.Token).ConfigureAwait(false);
             await StopMaintenanceAsync().ConfigureAwait(false);
+            work.Token.ThrowIfCancellationRequested();
             var result = await FinishAsync(confirmed, task, operation, key, work.Token, accepted.IdempotentReplay).ConfigureAwait(false);
             if (result.Stored is not null) lease = null;
             return result;
@@ -87,14 +93,27 @@ internal sealed partial class FoldersFolderStore
                     DateTimeOffset lastAuthorization = _nativeClock.GetUtcNow();
                     while (true)
                     {
-                        DateTimeOffset next = NextLeaseObservationAt(lease!, lastAuthorization);
+                        NativeLease current = lease!;
+                        DateTimeOffset next = NextLeaseObservationAt(current, lastAuthorization);
                         TimeSpan delay = next - _nativeClock.GetUtcNow();
                         await Task.Delay(delay > TimeSpan.Zero ? delay : TimeSpan.Zero, _nativeClock, maintenance!.Token).ConfigureAwait(false);
-                        if (_nativeClock.GetUtcNow() >= lease!.ExpiresAt) throw new InvalidOperationException("folders_lease_expired");
-                        bool renewalDue = _nativeClock.GetUtcNow() >= lease.EffectiveAt.AddSeconds(lease.RenewalIntervalSeconds);
-                        lease = await _native.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
-                            LeaseRequest(renewalDue ? "renew" : "validate", lease), maintenance.Token).ConfigureAwait(false);
-                        lastAuthorization = _nativeClock.GetUtcNow();
+                        DateTimeOffset now = _nativeClock.GetUtcNow();
+                        if (now >= current.ExpiresAt) throw new InvalidOperationException("folders_lease_expired");
+                        DateTimeOffset renewalAt = current.EffectiveAt.AddSeconds(current.RenewalIntervalSeconds);
+                        bool renewalDue = now >= renewalAt;
+                        NativeLease observed = await _native.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
+                            LeaseRequest(renewalDue ? "renew" : "validate", current), maintenance.Token).ConfigureAwait(false);
+                        now = _nativeClock.GetUtcNow();
+                        if (observed is null || !IsUsableLeaseWindow(observed, now) ||
+                            observed.LockFence != current.LockFence || observed.LockId != current.LockId ||
+                            observed.OwnershipProof != current.OwnershipProof ||
+                            !MatchesObservationWindow(current, observed, renewalDue ? renewalAt : null))
+                        {
+                            throw new InvalidOperationException("folders_lease_observation_invalid");
+                        }
+
+                        lease = observed;
+                        lastAuthorization = now;
                     }
                 }
                 catch (OperationCanceledException) when (maintenance!.IsCancellationRequested) { }
@@ -164,7 +183,7 @@ internal sealed partial class FoldersFolderStore
             {
                 if (string.IsNullOrEmpty(evidence.LockId) || string.IsNullOrEmpty(evidence.OwnershipProof)) return EvidenceUnavailable();
                 _ = await _native!.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, queryTask, new NativeLeaseRequest
-                { Operation = "complete", RequestedLeaseSeconds = 300, LockId = evidence.LockId, OwnershipProof = evidence.OwnershipProof,
+                { Operation = "complete", RequestedLeaseSeconds = RequestedLeaseSeconds, LockId = evidence.LockId, OwnershipProof = evidence.OwnershipProof,
                     LockFence = evidence.LockFence, OperationId = queryOperation, AcceptedKey = key, Fingerprint = evidence.Fingerprint }, cancellation).ConfigureAwait(false);
             }
             return MailboxAttachmentStorageResult.Succeeded(new StoredMailboxAttachmentReference(folder, evidence.FileId,
@@ -175,10 +194,24 @@ internal sealed partial class FoldersFolderStore
         => new[] { lease.EffectiveAt.AddSeconds(lease.RenewalIntervalSeconds),
             lastAuthorization.AddSeconds(lease.AuthorizationIntervalSeconds), lease.ExpiresAt }.Min();
 
+    private static bool IsUsableLeaseWindow(NativeLease lease, DateTimeOffset now)
+        => lease.EffectiveAt != default &&
+            lease.EffectiveAt <= now &&
+            lease.ExpiresAt > now &&
+            lease.RenewalIntervalSeconds is >= 1 and <= 30 &&
+            lease.AuthorizationIntervalSeconds is >= 1 and <= 15;
+
+    private static bool MatchesObservationWindow(NativeLease current, NativeLease observed, DateTimeOffset? renewalAt)
+        // Renewal advances the window at or after its scheduled boundary. Validation keeps both times.
+        => renewalAt is { } boundary
+            ? observed.EffectiveAt >= boundary &&
+                observed.ExpiresAt - observed.EffectiveAt == TimeSpan.FromSeconds(RequestedLeaseSeconds)
+            : observed.EffectiveAt == current.EffectiveAt && observed.ExpiresAt == current.ExpiresAt;
+
     private static FileMutationRequest KeyOnly(string operation, PathMetadata path, string hash)
         => new() { OperationId = operation, PathMetadata = path, FileOperationKind = FileMutationRequestFileOperationKind.Add, ContentHashReference = hash };
     private static NativeLeaseRequest LeaseRequest(string operation, NativeLease lease)
-        => new() { Operation = operation, RequestedLeaseSeconds = 300, LockId = lease.LockId,
+        => new() { Operation = operation, RequestedLeaseSeconds = RequestedLeaseSeconds, LockId = lease.LockId,
             OwnershipProof = lease.OwnershipProof, LockFence = lease.LockFence };
     private static MailboxAttachmentStorageResult NativeFailure(bool retryable, string reason)
         => MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
