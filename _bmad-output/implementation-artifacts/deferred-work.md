@@ -2300,6 +2300,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
   summary: Architecture tests no longer prevent Graph/mailbox re-ingestion, Party/Folder current-state reads, or baseline-partition writes the live-recovery ADR still says they prevent.
   evidence: `docs/adrs/live-recovery-validation-drivers.md` still claims those scans; `LiveRecoveryValidationArchitectureTests.ProjectionRebuildTopology_ShouldKeepIndependentSeedAndProductionReplayPaths` only string-matches seed/rebuild datasets and the production replay types. Later architecture-test rewrite, not this story.
+  resolution: Resolved 2026-11-25. An executable rebuild regression verifies the exact baseline and fresh read sets, fresh-only writes and erases, and the neighboring tenant’s retained value and ETag. The ADR describes the independent replay input and the actual architecture checks. All 57 focused integration cases passed.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
   summary: Workflow attempt-envelope, deadline, runsettings, and live-method architecture pins were removed after this story.

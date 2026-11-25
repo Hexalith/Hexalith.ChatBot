@@ -51,6 +51,9 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     /// <summary>Invoked with the exact read-model key before each storage observation.</summary>
     public Action<string>? OnReadKey { get; set; }
 
+    /// <summary>Invoked with the exact read-model key after a successful write.</summary>
+    public Action<string>? OnWriteKey { get; set; }
+
     /// <summary>Invoked with the exact read-model key after a successful erase.</summary>
     public Action<string>? OnEraseKey { get; set; }
 
@@ -117,6 +120,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
 
         _entries[CompositeKey(storeName, key)] = new Entry(value, NextEtag());
         Interlocked.Increment(ref _writes);
+        OnWriteKey?.Invoke(key);
         return Task.CompletedTask;
     }
 
@@ -152,6 +156,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
                 if (_entries.TryAdd(compositeKey, new Entry(value, NextEtag())))
                 {
                     Interlocked.Increment(ref _writes);
+                    OnWriteKey?.Invoke(key);
                     return Task.FromResult(true);
                 }
 
@@ -166,6 +171,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
             if (_entries.TryUpdate(compositeKey, new Entry(value, NextEtag()), current))
             {
                 Interlocked.Increment(ref _writes);
+                OnWriteKey?.Invoke(key);
                 return Task.FromResult(true);
             }
         }

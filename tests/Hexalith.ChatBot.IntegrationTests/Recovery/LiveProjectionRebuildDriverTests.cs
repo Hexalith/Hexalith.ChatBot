@@ -50,6 +50,7 @@ public sealed class LiveProjectionRebuildDriverTests
         InMemoryWormAuditStore worm = new();
         _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
         _ = await worm.AppendAsync(Envelope("replay-test:neighbor", "foreign-001"), TestContext.Current.CancellationToken);
+        const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
         InMemoryRecoveryReadModelStore readModels = new();
         ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
             readModels,
@@ -58,6 +59,21 @@ public sealed class LiveProjectionRebuildDriverTests
             [Source(tenantRef)],
             worm.EnumerateChain(tenantRef),
             TestContext.Current.CancellationToken);
+        string baselineTenant = $"{tenantRef}:baseline:recovery-partition-v1";
+        string freshTenant = $"{tenantRef}:rebuild:recovery-partition-v1:{correlationId}";
+        string[] baselineKeys =
+        [
+            $"{baselineTenant}:project-conversation-source-email:intake-001",
+            $"{baselineTenant}:governed-operation:resource-001",
+        ];
+        readModels.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBe(baselineKeys, ignoreOrder: true);
+        string[] freshKeys =
+        [
+            $"{freshTenant}:project-conversation-source-email:intake-001",
+            $"{freshTenant}:project-conversation-attachments:intake-001",
+            $"{freshTenant}:project-conversation:intake-001:attachments",
+            $"{freshTenant}:governed-operation:resource-001",
+        ];
         ProjectConversationSourceEmailView neighbor = Source("replay-test:neighbor");
         await readModels.SaveAsync(ChatBotReadModelStoreNames.StateStoreName,
             ProjectConversationSourceEmailView.KeyFor(neighbor.TenantId, neighbor.IntakeId), neighbor,
@@ -66,6 +82,12 @@ public sealed class LiveProjectionRebuildDriverTests
         ReadModelEntry<ProjectConversationSourceEmailView> neighborBefore = await readModels.GetAsync<ProjectConversationSourceEmailView>(
             ChatBotReadModelStoreNames.StateStoreName,
             ProjectConversationSourceEmailView.KeyFor(neighbor.TenantId, neighbor.IntakeId), TestContext.Current.CancellationToken);
+        List<string> reads = [];
+        List<string> writes = [];
+        List<string> erases = [];
+        readModels.OnReadKey = reads.Add;
+        readModels.OnWriteKey = writes.Add;
+        readModels.OnEraseKey = erases.Add;
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
             worm,
@@ -79,8 +101,15 @@ public sealed class LiveProjectionRebuildDriverTests
         ProjectionRebuildMeasurement measurement = await driver.RebuildAsync(
             tenantRef,
             "recovery-baseline",
-            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            correlationId,
             TestContext.Current.CancellationToken);
+
+        // The replayed source projection also probes the fresh conversation before notifying readers.
+        string[] expectedReads = [.. baselineKeys, .. freshKeys, $"{freshTenant}:project-conversation:intake-001:items"];
+        reads.Distinct(StringComparer.Ordinal).ShouldBe(expectedReads, ignoreOrder: true);
+        writes.ShouldBe(freshKeys, ignoreOrder: true);
+        erases.ShouldBe(freshKeys, ignoreOrder: true);
+        readModels.OnReadKey = null;
 
         measurement.PreRebuildSnapshot.Count.ShouldBe(2);
         measurement.PreRebuildSnapshot.ShouldContain(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal));
