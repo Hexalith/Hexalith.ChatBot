@@ -3,6 +3,8 @@ using System.Text.Json;
 
 using Dapr;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Operations;
+using Hexalith.EventStore.Contracts.Projections;
 using Hexalith.EventStore.DomainService;
 
 using Microsoft.AspNetCore.Builder;
@@ -10,6 +12,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
+using static Hexalith.ChatBot.Server.Projections.ChatBotProjectionPayload;
 
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
@@ -26,11 +30,10 @@ namespace Hexalith.ChatBot.Server.Projections;
 /// governed-operation route alone, so the other six read models never received published events.
 /// </para>
 /// <para>
-/// This route carries the one subscription. It reads the body once and runs each family's existing projection in the
-/// original mapping order, binding the family's envelope with the host's HTTP JSON options. A family whose envelope
-/// cannot bind the body is skipped with a metadata-only warning, and its translator ignores foreign events that do
-/// bind. The route answers 200 only when every family succeeds. A family fault propagates so DAPR redelivers the
-/// event, and the idempotent, version-stamped handlers absorb the replay of the families already applied.
+/// This route carries the one subscription. EventStore envelopes are matched by event type and adapted from their
+/// concrete payload bytes. Flattened deliveries still run each family's original binding in order. An unbindable
+/// envelope is skipped with a metadata-only warning. Projection faults propagate so DAPR redelivers the event, and
+/// the idempotent, version-stamped handlers absorb replays.
 /// </para>
 /// <para>
 /// The association family runs without its own application-channel comparison: this route's sidecar guard already
@@ -167,6 +170,11 @@ internal static partial class ChatBotProjectionFanOutEndpoints
             }
 
             JsonSerializerOptions options = jsonOptions.Value.SerializerOptions;
+            if (TryGetProperty(body, "payload", out JsonElement payload) && payload.ValueKind != JsonValueKind.Null)
+            {
+                return await ProjectEventStoreAsync(body, payload, options, context, cancellationToken).ConfigureAwait(false);
+            }
+
             foreach (Func<JsonElement, JsonSerializerOptions, HttpContext, CancellationToken, Task<IResult>?> family in _families)
             {
                 Task<IResult>? projection = family(body, options, context, cancellationToken);
@@ -186,6 +194,133 @@ internal static partial class ChatBotProjectionFanOutEndpoints
         return Results.Ok();
     }
 
+    private static async Task<IResult> ProjectEventStoreAsync(
+        JsonElement body,
+        JsonElement payload,
+        JsonSerializerOptions options,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        JsonElement metadata = TryGetProperty(body, "metadata", out JsonElement nestedMetadata) ? nestedMetadata : body;
+        if (!TryBind(metadata, options, context, "event-store", out PublishedGovernedOperationEvent? envelope) ||
+            envelope.Domain != ChatBotEventStore.DomainName ||
+            string.IsNullOrWhiteSpace(envelope.EventTypeName) ||
+            string.IsNullOrWhiteSpace(envelope.TenantId) ||
+            string.IsNullOrWhiteSpace(envelope.AggregateId) ||
+            envelope.SequenceNumber <= 0 ||
+            envelope.Timestamp == default)
+        {
+            return Results.Ok();
+        }
+
+        if (payload.ValueKind != JsonValueKind.String || !payload.TryGetBytesFromBase64(out byte[]? bytes))
+        {
+            LogBindingSkipped(context, "event-store", metadata);
+            return Results.Ok();
+        }
+
+        string eventType = envelope.EventTypeName.Split(',', 2)[0];
+        var request = new ProjectionRequest(envelope.TenantId, envelope.Domain, envelope.AggregateId, []);
+        var projectionEvent = new ProjectionEventDto(
+            eventType, bytes, "json", envelope.SequenceNumber, envelope.Timestamp, envelope.CorrelationId ?? string.Empty, envelope.MessageId);
+
+        object? published;
+        try
+        {
+            published = CreatePublishedEvent(request, projectionEvent);
+        }
+        catch (JsonException)
+        {
+            LogBindingSkipped(context, "event-store", metadata);
+            return Results.Ok();
+        }
+
+        // Invoke only the read-model handlers. The SDK projection owns the outbox, queues and coverage.
+        switch (published)
+        {
+            case PublishedMailboxIntakeEvent mailbox when MailboxIntakeProjectionTranslator.TryCreateNotification(mailbox) is { } intake:
+                _ = await Service<AssociationProjectionHandler>(context).HandleAsync(
+                    intake.Captured, intake.TenantId, intake.SourceVersion, intake.CorrelationId, runSideEffects: false, cancellationToken)
+                    .ConfigureAwait(false);
+                return Results.Ok();
+            case PublishedAssociationEvent association when AssociationProjectionTranslator.TryCreateNotification(association) is { } notification:
+                _ = await Service<AssociationProjectionHandler>(context).HandleAsync(
+                    notification, runSideEffects: false, cancellationToken).ConfigureAwait(false);
+                return Results.Ok();
+            case PublishedParticipantResolutionEvent participant:
+                return await ParticipantResolutionProjectionEndpoints.ProjectAsync(
+                    participant, Service<ParticipantResolutionProjectionHandler>(context), cancellationToken).ConfigureAwait(false);
+            case PublishedAiActionExecutionEvent execution:
+                _ = await Service<AiOutcomeProjectionHandler>(context).HandleAsync(execution, cancellationToken).ConfigureAwait(false);
+                return Results.Ok();
+            case PublishedTaskIntentEvent task:
+                return await TaskIntentProjectionEndpoints.ProjectAsync(
+                    task, Service<TaskIntentProjectionHandler>(context), cancellationToken).ConfigureAwait(false);
+            case PublishedAiActionApprovalEvent approval:
+                return await ApprovalProjectionEndpoints.ProjectAsync(
+                    approval, Service<ApprovalProjectionHandler>(context), cancellationToken).ConfigureAwait(false);
+            default:
+                return await GovernedOperationProjectionEndpoints.ProjectAsync(
+                    envelope with { EventTypeName = eventType, Payload = bytes },
+                    Service<GovernedOperationProjectionHandler>(context),
+                    Service<GovernedControlStateProjectionHandler>(context),
+                    cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static object? CreatePublishedEvent(ProjectionRequest request, ProjectionEventDto item)
+    {
+        string eventType = item.EventTypeName;
+        if (eventType == MailboxIntakeProjectionTranslator.IntakeCapturedEventType)
+        {
+            return TryCreatePublishedEvent<PublishedMailboxIntakeEvent>(request, item);
+        }
+
+        if (AssociationProjectionTranslator.IsAssociationEvent(eventType))
+        {
+            return TryCreatePublishedEvent<PublishedAssociationEvent>(request, item);
+        }
+
+        if (eventType == ParticipantResolutionProjectionTranslator.ResolvedEventType ||
+            eventType == ParticipantResolutionProjectionTranslator.UnresolvedEventType)
+        {
+            return TryCreatePublishedEvent<PublishedParticipantResolutionEvent>(request, item);
+        }
+
+        if (TaskIntentProjectionTranslator.IsSupportedTaskIntentEvent(eventType))
+        {
+            return TryCreateFlatTaskIntentEvent(request, item) ?? TryCreatePublishedEvent<PublishedTaskIntentEvent>(request, item);
+        }
+
+        return (object?)TryCreateFlatConversationEvent(request, item)
+            ?? (object?)TryCreateFlatApprovalEvent(request, item)
+            ?? TryCreateFlatAiActionExecutionEvent(request, item);
+    }
+
+    private static bool TryGetProperty(JsonElement body, string name, out JsonElement value)
+    {
+        if (body.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty property in body.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static void LogBindingSkipped(HttpContext context, string family, JsonElement metadata)
+        => EnvelopeBindingSkipped(
+            Service<ILoggerFactory>(context).CreateLogger(typeof(ChatBotProjectionFanOutEndpoints)),
+            family,
+            EventTypeName(metadata));
+
     private static bool TryBind<TEnvelope>(
         JsonElement body,
         JsonSerializerOptions options,
@@ -201,10 +336,7 @@ internal static partial class ChatBotProjectionFanOutEndpoints
         catch (JsonException)
         {
             // The exception is deliberately not logged: its message can quote the delivered body.
-            EnvelopeBindingSkipped(
-                Service<ILoggerFactory>(context).CreateLogger(typeof(ChatBotProjectionFanOutEndpoints)),
-                family,
-                EventTypeName(body));
+            LogBindingSkipped(context, family, body);
             published = null;
         }
 
@@ -224,7 +356,7 @@ internal static partial class ChatBotProjectionFanOutEndpoints
     /// <summary>Reduces the untrusted event type name to a bounded, log-safe token.</summary>
     private static string EventTypeName(JsonElement body)
         => AuditMetadata.SafeOptionalToken(
-            body.TryGetProperty("eventTypeName", out JsonElement eventTypeName) && eventTypeName.ValueKind == JsonValueKind.String
+            TryGetProperty(body, "eventTypeName", out JsonElement eventTypeName) && eventTypeName.ValueKind == JsonValueKind.String
                 ? eventTypeName.GetString()
                 : null)
             ?? "unknown";

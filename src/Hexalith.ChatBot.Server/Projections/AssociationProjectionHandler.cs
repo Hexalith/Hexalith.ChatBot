@@ -32,9 +32,16 @@ internal sealed class AssociationProjectionHandler
         Ignored,
     }
 
-    public async Task<ProjectionOutcome> HandleAsync(
+    public Task<ProjectionOutcome> HandleAsync(
         AssociationNotification notification,
         CancellationToken cancellationToken = default)
+        => HandleAsync(notification, runSideEffects: true, cancellationToken);
+
+    /// <summary>Updates association read models and optionally runs the owner projection's side effects.</summary>
+    internal async Task<ProjectionOutcome> HandleAsync(
+        AssociationNotification notification,
+        bool runSideEffects,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
 
@@ -155,15 +162,18 @@ internal sealed class AssociationProjectionHandler
                 }
             }
 
-            await CaptureAttachmentsAsync(
-                view.TenantId,
-                view.IntakeId,
-                view.SourceVersion,
-                view.CorrelationId,
-                cancellationToken).ConfigureAwait(false);
+            if (runSideEffects)
+            {
+                await CaptureAttachmentsAsync(
+                    view.TenantId,
+                    view.IntakeId,
+                    view.SourceVersion,
+                    view.CorrelationId,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
 
-        if (_aiActionProposalInvalidationCoordinator is not null && !string.IsNullOrWhiteSpace(view.CorrectionId))
+        if (runSideEffects && _aiActionProposalInvalidationCoordinator is not null && !string.IsNullOrWhiteSpace(view.CorrectionId))
         {
             await _aiActionProposalInvalidationCoordinator
                 .InvalidateAsync(view, cancellationToken)
@@ -173,12 +183,22 @@ internal sealed class AssociationProjectionHandler
         return ProjectionOutcome.Applied;
     }
 
-    public async Task<ProjectionOutcome> HandleAsync(
+    public Task<ProjectionOutcome> HandleAsync(
         MailboxMessageIntakeCaptured captured,
         string tenantId,
         long sourceVersion,
         string correlationId,
         CancellationToken cancellationToken = default)
+        => HandleAsync(captured, tenantId, sourceVersion, correlationId, runSideEffects: true, cancellationToken);
+
+    /// <summary>Updates intake read models and optionally runs attachment capture.</summary>
+    internal async Task<ProjectionOutcome> HandleAsync(
+        MailboxMessageIntakeCaptured captured,
+        string tenantId,
+        long sourceVersion,
+        string correlationId,
+        bool runSideEffects,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
@@ -207,7 +227,7 @@ internal sealed class AssociationProjectionHandler
             sourceVersion,
             correlationId);
         await _conversationStore.UpsertAttachmentReferencesAsync(attachments, cancellationToken).ConfigureAwait(false);
-        if (captured.AttachmentReferences.Count > 0)
+        if (runSideEffects && captured.AttachmentReferences.Count > 0)
         {
             await CaptureAttachmentsAsync(
                 tenantId,

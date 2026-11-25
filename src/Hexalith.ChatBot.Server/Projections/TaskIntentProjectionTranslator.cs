@@ -85,7 +85,8 @@ internal static class TaskIntentProjectionTranslator
             RetentionClass: published.Proposal.RetentionClass);
     }
 
-    private static bool IsSupportedTaskIntentEvent(string? eventTypeName)
+    /// <summary>Returns whether the event carries a persisted task intent.</summary>
+    public static bool IsSupportedTaskIntentEvent(string? eventTypeName)
         => string.Equals(eventTypeName, typeof(TaskIntentCaptured).FullName, StringComparison.Ordinal) ||
             string.Equals(eventTypeName, typeof(TaskIntentConvertedToAiActionProposal).FullName, StringComparison.Ordinal) ||
             string.Equals(eventTypeName, typeof(TaskIntentDispositionMarked).FullName, StringComparison.Ordinal);

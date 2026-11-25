@@ -4,8 +4,16 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Server.Association.Participants;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Conversations;
+using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.ServiceDefaults.Authentication;
@@ -16,6 +24,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
+using EventStoreMetadata = Hexalith.EventStore.Contracts.Events.EventMetadata;
+using NestedEventStoreEnvelope = Hexalith.EventStore.Contracts.Events.EventEnvelope;
 using EventStoreEnvelope = Hexalith.EventStore.Server.Events.EventEnvelope;
 
 namespace Hexalith.ChatBot.Server.Tests.Projections;
@@ -192,6 +202,185 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
                 outcome.SourceVersion.ShouldBe(60);
                 break;
         }
+    }
+
+    /// <summary>Both EventStore envelope shapes project concrete producer payloads idempotently.</summary>
+    /// <param name="nestedMetadata">Whether EventStore metadata is nested or alongside the payload.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FanOutShouldProjectConcreteEventStorePayloadsIdempotently(bool nestedMetadata)
+    {
+        var sideEffects = new RecordingAssociationProjectionSideEffects();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddSingleton<IAttachmentCaptureCoordinator>(sideEffects)));
+        using HttpClient client = factory.CreateAppChannelClient();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        IProjectConversationProjectionStore store = factory.Services.GetRequiredService<IProjectConversationProjectionStore>();
+        PublishedMailboxIntakeEvent intake = ProjectConversationProjectionTests.PublishedIntake(3);
+        PublishedAssociationEvent association = AssociationProjectionTests.Published(1);
+        PublishedParticipantResolutionEvent participant = ParticipantResolutionProjectionTests.PublishedResolved(1);
+        var captured = new MailboxMessageIntakeCaptured(
+            intake.IntakeId!, intake.ProviderMessageId!, intake.InternetMessageId!, intake.ConversationId!, intake.ThreadId,
+            intake.MailboxId!, intake.Sender!, intake.Recipients!, intake.ReceivedAtUtc, intake.SentAtUtc, intake.CreatedAtUtc,
+            [new MailboxAttachmentReference("attachment-001", "summary.pdf", "application/pdf", 100)], intake.SourceTimezone, intake.SourceContext!, intake.SourceProvenance!,
+            intake.DerivationKernelVersion!, intake.RedactionState!, intake.RetentionClass!, intake.SchemaVersion);
+        var associated = new MailboxEmailAssociatedToProject(
+            "payload-association", IntakeId, "payload-tenant", ProjectId, association.ProjectDisplayName,
+            association.SourceMailboxId!, association.SourceConversationId!, association.SourceThreadId,
+            [], [], association.ConfidenceScore, association.ThresholdBand, [], association.ThresholdPolicyVersion!,
+            association.DerivationKernelVersion!, OccurredAt, association.RedactionState!, association.RetentionClass!,
+            900, "v1", "payload-correlation");
+        var resolved = new MailboxParticipantResolved(
+            "payload-resolution", IntakeId, SourceParticipantId, participant.PartyId!, Tenant,
+            participant.EvidenceReference!, participant.EvidenceFingerprint!, participant.SourceMailboxId!,
+            "mailbox", "kernel", "metadata_only", "collaboration_input", 900, "v1");
+        var intent = new TaskIntentCaptured(new TaskIntentRecord(
+            "task-intent-001", Tenant, ProjectId, "graph-message-001", "party-001", "Request review",
+            ProjectConversationDetectedActionKind.RequestAction, [new("evidence-001", 0, 10, "safe-token")],
+            "kernel", 0.82, OccurredAt, TaskIntentState.Captured, "v1", "captured",
+            "authorized-project-conversation", "metadata_only", "collaboration_input", 900, "payload-correlation"));
+        var marked = new TaskIntentDispositionMarked(
+            intent.Record with { State = TaskIntentState.NotActionable },
+            "not-actionable", "reviewer-001", OccurredAt, null, "audit:task-intent-001");
+        AiActionApprovalRequested approvedRequest = ProjectConversationProjectionTests.ApprovalRequestPublished(8).Request! with
+        {
+            SourceVersion = 900,
+        };
+        var executed = new ApprovedAiActionExecutionSucceeded(
+            new ApprovedAiActionExecutionRecord(
+                "execution-001", "proposal-001", "approval-001", "Project.AppendConversationMessage",
+                "allowlist.v1", "success", OccurredAt, "audit:execution-001", "available", CorrelationId, "metadata_only", "none"),
+            ProjectId, "requester-001", "graph-message-001", "conversation-item-001");
+
+        foreach (EventStoreEnvelope envelope in new[]
+        {
+            EventStoreDelivery(IntakeId, 3, captured),
+            EventStoreDelivery(AssociationId, 1, associated),
+            EventStoreDelivery(ResolutionId, 1, resolved),
+            EventStoreDelivery(ProjectId, 5, intent),
+            EventStoreDelivery(ProjectId, 6, marked),
+            EventStoreDelivery(ProjectId, 8, approvedRequest),
+            EventStoreDelivery(ProjectId, 60, executed),
+            EventStoreDelivery(ProjectId, 12, TaskIntentMessagePublished().UserMessage! with { CorrelationId = "payload-correlation" }),
+        })
+        {
+            for (int delivery = 0; delivery < 2; delivery++)
+            {
+                using StringContent content = CloudEventContent(envelope, nestedMetadata);
+                using HttpResponseMessage response = await client.PostAsync(
+                    FanOutRoute, content, TestContext.Current.CancellationToken).ConfigureAwait(true);
+                response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            }
+
+            if (envelope.SequenceNumber == 5)
+            {
+                var capturedIntent = (await store.GetTaskIntentAsync(Tenant, ProjectId, intent.Record.TaskIntentId, cancellationToken)
+                    .ConfigureAwait(true)).ShouldNotBeNull();
+                capturedIntent.State.ShouldBe(TaskIntentState.Captured);
+                capturedIntent.CorrelationId.ShouldBe(CorrelationId);
+            }
+        }
+
+        sideEffects.AttachmentCaptures.ShouldBe(0);
+        (await store.GetSourceEmailAsync(Tenant, IntakeId, cancellationToken).ConfigureAwait(true))
+            .ShouldNotBeNull().SourceVersion.ShouldBe(3);
+        AssociationCandidateView candidate = (await factory.Services.GetRequiredService<IAssociationProjectionStore>()
+            .GetAsync(Tenant, AssociationId, cancellationToken).ConfigureAwait(true)).ShouldNotBeNull();
+        candidate.SourceVersion.ShouldBe(1);
+        candidate.CorrelationId.ShouldBe(CorrelationId);
+        (await factory.Services.GetRequiredService<IAssociationProjectionStore>()
+            .GetAsync("payload-tenant", "payload-association", cancellationToken).ConfigureAwait(true)).ShouldBeNull();
+        (await factory.Services.GetRequiredService<IParticipantResolutionProjectionStore>()
+            .GetAsync(Tenant, ResolutionId, SourceParticipantId, cancellationToken).ConfigureAwait(true))
+            .ShouldNotBeNull().SourceVersion.ShouldBe(1);
+        var disposition = (await store.GetTaskIntentAsync(Tenant, ProjectId, intent.Record.TaskIntentId, cancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        disposition.SourceVersion.ShouldBe(6);
+        disposition.State.ShouldBe(TaskIntentState.NotActionable);
+        disposition.CorrelationId.ShouldBe(CorrelationId);
+
+        IReadOnlyList<ProjectConversationItemView> items = await ConversationItemsAsync(factory).ConfigureAwait(true);
+        items.Where(item => item.Kind == ProjectConversationItemKind.ApprovalEvent)
+            .ShouldHaveSingleItem().SourceVersion.ShouldBe(8);
+        var message = items.Where(item => item.ItemId == "ui-message:001").ShouldHaveSingleItem();
+        message.SourceVersion.ShouldBe(12);
+        message.CorrelationId.ShouldBe(CorrelationId);
+        items.Where(item => item.Kind == ProjectConversationItemKind.AiOutcome).Select(item => item.SourceVersion)
+            .Order().ShouldBe([60L, 61L]);
+    }
+
+    /// <summary>Concrete association writes retry without rerunning the workflow side effects.</summary>
+    [Fact]
+    public async Task ConcreteAssociationWriteFaultShouldRedeliverWithoutWorkflowSideEffects()
+    {
+        var store = new FaultingAssociationProjectionStore();
+        var sideEffects = new RecordingAssociationProjectionSideEffects();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddSingleton<IAssociationProjectionStore>(store)
+                    .AddSingleton<IAttachmentCaptureCoordinator>(sideEffects)
+                    .AddSingleton<IAiActionProposalInvalidationCoordinator>(sideEffects)));
+        using HttpClient client = factory.CreateAppChannelClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        // Supply the existing correction view fields so this isolates delivery from propagation payload binding.
+        PublishedAssociationEvent correction = AssociationProjectionTests.Published(2) with
+        {
+            EventTypeName = AssociationProjectionTranslator.CorrectionPropagationStartedEventType,
+            CorrectionId = "correction-001",
+            CorrectedProjectId = ProjectId,
+        };
+        EventStoreEnvelope envelope = EventStoreDelivery(AssociationId, 2, correction) with
+        {
+            EventTypeName = correction.EventTypeName!,
+        };
+        using StringContent first = CloudEventContent(envelope, nestedMetadata: true);
+        using HttpResponseMessage failed = await client.PostAsync(FanOutRoute, first, token).ConfigureAwait(true);
+        failed.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+        (await store.GetAsync(Tenant, AssociationId, token).ConfigureAwait(true)).ShouldBeNull();
+
+        using StringContent replay = CloudEventContent(envelope, nestedMetadata: true);
+        using HttpResponseMessage redelivered = await client.PostAsync(FanOutRoute, replay, token).ConfigureAwait(true);
+        redelivered.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await store.GetAsync(Tenant, AssociationId, token).ConfigureAwait(true)).ShouldNotBeNull()
+            .CorrectionId.ShouldBe("correction-001");
+        sideEffects.AttachmentCaptures.ShouldBe(0);
+        sideEffects.ProposalInvalidations.ShouldBe(0);
+
+        using HttpResponseMessage legacy = await client.PostAsJsonAsync(FanOutRoute, correction, token).ConfigureAwait(true);
+        legacy.StatusCode.ShouldBe(HttpStatusCode.OK);
+        sideEffects.AttachmentCaptures.ShouldBe(1);
+        sideEffects.ProposalInvalidations.ShouldBe(1);
+    }
+
+    /// <summary>Foreign domains and unknown event types cannot use a conversation payload to project.</summary>
+    [Fact]
+    public async Task FanOutShouldIgnoreForeignConcreteEvents()
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
+        ProjectConversationMessageAppended message = TaskIntentMessagePublished().UserMessage!;
+        EventStoreEnvelope envelope = EventStoreDelivery(ProjectId, 12, message);
+
+        foreach (EventStoreEnvelope foreign in new[]
+        {
+            envelope with { Domain = "foreign-domain" },
+            envelope with { EventTypeName = "Foreign.MessageAppended" },
+            EventStoreDelivery(ProjectId, 12, message with { TenantId = "foreign-tenant" }),
+        })
+        {
+            using StringContent content = CloudEventContent(foreign, nestedMetadata: false);
+            using HttpResponseMessage response = await client.PostAsync(
+                FanOutRoute, content, TestContext.Current.CancellationToken).ConfigureAwait(true);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        (await ConversationItemsAsync(factory).ConfigureAwait(true)).ShouldBeEmpty();
+        (await factory.Services.GetRequiredService<IProjectConversationProjectionStore>()
+            .ReadPageAsync("foreign-tenant", ProjectId, null, 25, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).Items.ShouldBeEmpty();
     }
 
     /// <summary>
@@ -375,6 +564,36 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
         GovernedOperationView view = (await store.GetAsync(Tenant, NoteId, TestContext.Current.CancellationToken).ConfigureAwait(true))
             .ShouldNotBeNull();
         view.SourceVersion.ShouldBe(1);
+    }
+
+    private static EventStoreEnvelope EventStoreDelivery(string aggregateId, long sequence, object payload)
+        => new(
+            MessageId, aggregateId, nameof(GovernedOperationAggregate), Tenant, "chatbot", sequence, sequence,
+            OccurredAt, CorrelationId, MessageId, "actor-001", "v1", payload.GetType().FullName!, 1, "json",
+            JsonSerializer.SerializeToUtf8Bytes(payload, payload.GetType()), null);
+
+    private static StringContent CloudEventContent(EventStoreEnvelope envelope, bool nestedMetadata)
+    {
+        JsonNode? data = nestedMetadata
+            ? JsonSerializer.SerializeToNode(new NestedEventStoreEnvelope(
+                new EventStoreMetadata(envelope.MessageId, envelope.AggregateId, envelope.AggregateType, envelope.TenantId,
+                    envelope.Domain, envelope.SequenceNumber, envelope.GlobalPosition, envelope.Timestamp,
+                    envelope.CorrelationId, envelope.CausationId, envelope.UserId, envelope.DomainServiceVersion,
+                    envelope.EventTypeName, envelope.MetadataVersion, envelope.SerializationFormat),
+                envelope.Payload, null))
+            : JsonSerializer.SerializeToNode(envelope, JsonSerializerOptions.Web);
+        JsonObject cloudEvent = new()
+        {
+            ["specversion"] = "1.0",
+            ["id"] = envelope.MessageId,
+            ["source"] = $"hexalith-eventstore/{envelope.TenantId}/{envelope.Domain}",
+            ["type"] = envelope.EventTypeName,
+            ["datacontenttype"] = "application/json",
+            ["pubsubname"] = ChatBotProjectionSubscriptionDefaults.PubSubName,
+            ["topic"] = ChatBotProjectionSubscriptionDefaults.Topic,
+            ["data"] = data,
+        };
+        return new StringContent(cloudEvent.ToJsonString(), Encoding.UTF8, "application/cloudevents+json");
     }
 
     // The subscribe handler emits routes without their leading slash, which the sidecar accepts either way.

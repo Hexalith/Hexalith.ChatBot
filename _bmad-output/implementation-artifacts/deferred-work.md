@@ -1259,6 +1259,7 @@ archived: 2026-11-24
   summary: Failure conversation items can still expose sensitive token-shaped category, scope, dependency, or escalation metadata.
   evidence: `ChatBotFailureStateConversationItem.razor` displays these projected fields; `FailureStateProjectionTranslator.SafeOptionalToken` checks shape only. This display existed at Story 1.4 baseline. Audit the producer provenance and replace any sensitive field with a fixed safe catalog value.
   triage: 2026-11-24 Skipped. No production path writes these fields today, because `FailureStateProjectionHandler` has no route or registration. Category, scope and dependency also need a product allowlist.
+  triage: 2026-11-25 Still blocked. The live fan-out fix covers the six existing producers. Failure-state projection still requires a producer and product rules for safe category, scope, dependency and escalation metadata.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: The gateway redaction stage copies correlation and task identifiers without validating their provenance.
   evidence: `CoarseUserFacingRedactionStage.Apply` copied both fields at Story 1.4 baseline. HTTP middleware validates incoming identifiers, but internal callers should be traced before deciding whether the stage needs its own validation.
@@ -2329,6 +2330,11 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: Six projection families (mailbox-intake, association, participant-resolution, ai-outcome, task-intent and approval) read flattened domain fields, but EventStore publishes each event inside the envelope's `payload` bytes, so live deliveries bind with null domain data and are ignored.
   evidence: High, pre-existing, exposed by the L1208 fan-out. `references/Hexalith.EventStore/src/Hexalith.EventStore.Server/Events/EventPublisher.cs:199-229` publishes `EventEnvelope` (metadata plus `Payload`). Only the governed-operation and governed-control translators decode `payload`. The other `Published*Event` records expect top-level `record`, `request`, `intakeId` and similar, and their fan-out tests post pre-flattened records. Failure-state projections also have no route or registration. Settle by decoding each family's payload by `eventTypeName` and adding EventStore-envelope rows to `ChatBotProjectionFanOutEndpointsTests`.
+  resolution: Resolved 2026-11-25. Fan-out adapts concrete EventStore payload bytes for all six families using trusted envelope metadata and shared SDK payload mapping. The fan-out and review-queue projection suites passed 34 cases, covering both envelope shapes, compatibility, replay, foreign events, authorization and write-fault redelivery. The review regression covers concrete task disposition, envelope correlation, retry after an association write fault and SDK ownership of workflow side effects.
+
+- source_spec: none
+  summary: Association correction propagation events omit evidence required by the projection translator.
+  evidence: The producer records `MailboxAssociationCorrectionPropagationStarted.cs`, `MailboxAssociationCorrectionStoreInvalidated.cs`, `MailboxAssociationCorrectionPropagationCompleted.cs`, and `MailboxAssociationCorrectionPropagationDelayed.cs` omit `ThresholdPolicyVersion` and `DerivationKernelVersion`. `AssociationProjectionTranslator.cs` requires both before translating the event. Resolve with an ordered merge against the existing association's evidence and tests for out-of-order replay.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: A decision or correction failure that completes after the reviewer moved to another association may still be applied, announced and focused on the new association's page.
