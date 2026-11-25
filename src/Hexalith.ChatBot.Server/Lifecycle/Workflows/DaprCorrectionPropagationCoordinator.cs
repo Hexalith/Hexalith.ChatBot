@@ -47,14 +47,20 @@ internal sealed class DaprCorrectionPropagationCoordinator(
                 request.TenantId,
                 CorrectionPropagationWorkflowStatuses.Started,
                 CorrectionPropagationWorkflowFailureCodes.None);
-            await _statusSink
-                .ReportAsync(
-                    scheduledRequest,
-                    CorrectionPropagationWorkflowStatuses.Started,
-                    workflowRetryCount: 0,
-                    CorrectionPropagationWorkflowFailureCodes.None,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            if (scheduledRequest.OperationAcceptedAtUtc is null || string.IsNullOrWhiteSpace(scheduledRequest.OperationClass))
+            {
+                // Legacy inputs rely on the scheduling acknowledgement for status. New inputs carry their
+                // receipt identity, so the workflow activities can report progress before the gateway writes it.
+                // A scheduling acknowledgement must not erase that progress or fail an accepted submission.
+                await _statusSink
+                    .ReportAsync(
+                        scheduledRequest,
+                        CorrectionPropagationWorkflowStatuses.Started,
+                        workflowRetryCount: 0,
+                        CorrectionPropagationWorkflowFailureCodes.None,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException)
         {

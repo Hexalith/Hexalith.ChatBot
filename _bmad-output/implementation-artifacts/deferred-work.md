@@ -1127,6 +1127,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: A fast workflow can publish completion before acceptance initializes its operation-status record and have the report discarded.
   evidence: Loop 15 BH3 verified the baseline status sink returns on a missing operation record, while the baseline dispatcher starts workflows before the gateway initializes status. Preserving early reports requires a status initialization and merge lifecycle that also avoids overwriting terminal progress.
+  resolution: Resolved 2026-11-25. The dispatcher carries the accepted operation identity into durable correction work after SDK acknowledgement. Early workflow reports atomically initialize matching status, the scheduling acknowledgement cannot overwrite them, and the later gateway write merges audit status. The dispatcher, status sink and coordinator suite passed 182 cases.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: Duplicate replay can overwrite concurrent workflow completion or failure status through a non-atomic read and upsert.
   evidence: Loop 15 BH4 verified the same read/with/upsert sequence exists at the canonical baseline; workflow publication between the replay read and write can lose its terminal state and guidance. An atomic operation-status merge or conditional-update policy must resolve this pre-existing race.

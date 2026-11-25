@@ -121,7 +121,11 @@ internal sealed class AcceptedCommandDispatcher(
             if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
             {
                 await correctionPropagation
-                    .StartAsync(plan.CorrectionPropagation, cancellationToken)
+                    .StartAsync(plan.CorrectionPropagation with
+                    {
+                        OperationAcceptedAtUtc = context.PreparedAcceptedAt,
+                        OperationClass = context.Idempotency?.OperationClass,
+                    }, cancellationToken)
                     .ConfigureAwait(false);
             }
 

@@ -1,3 +1,4 @@
+using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Contracts.Messages;
@@ -40,7 +41,31 @@ internal sealed class OperationStatusWorkflowStatusSink(
                 : ChatBotMessageCodes.AssociationCorrectionPropagationPending;
         await statusStore.UpdateAsync(request.TenantId, request.OperationId, existing =>
         {
-            if (existing is null) { return null; }
+            if (request.OperationAcceptedAtUtc is { } acceptedAt && !string.IsNullOrWhiteSpace(request.OperationClass))
+            {
+                if (existing is not null &&
+                    (existing.CommandId != request.OperationId || existing.CorrelationId != request.CorrelationId ||
+                        existing.AcceptedAt != acceptedAt || existing.OperationClass != request.OperationClass))
+                {
+                    return null;
+                }
+
+                // The dispatcher attaches the prepared receipt only after SDK submission returns. The gateway
+                // will merge its final audit status into this same record when it finishes accepting the command.
+                existing ??= OperationStatusRecord.Accepted(request.TenantId, new CommandSubmissionResponse
+                {
+                    CommandId = request.OperationId,
+                    OperationId = request.OperationId,
+                    CorrelationId = request.CorrelationId,
+                    AcceptedAt = acceptedAt,
+                    LifecycleState = LifecycleState.Proposed,
+                }, auditReconciliationRequired: true, now, request.OperationClass);
+            }
+
+            if (existing is null || existing.CanonicalRevision is not null)
+            {
+                return null;
+            }
             // Completion is final for this instance. Started after Failed still applies because it is the supported
             // restart, so a stale Started can also reopen Failed. A same-instance Retrying or Delayed report cannot
             // reopen Failed, and a lower Retrying count cannot rewind Retrying. Other stale reports can still reopen

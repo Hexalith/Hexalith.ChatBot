@@ -14,4 +14,6 @@ internal sealed record CorrectionPropagationRequest(
     DateTimeOffset StartedAtUtc,
     DateTimeOffset EstimatedCompletionAtUtc,
     string CorrectedCaseId = "",
-    string OperationId = "");
+    string OperationId = "",
+    DateTimeOffset? OperationAcceptedAtUtc = null,
+    string? OperationClass = null);

@@ -3,6 +3,7 @@ using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
@@ -37,6 +38,35 @@ public sealed class CorrectionPropagationCoordinatorTests
         metrics.WorkflowLifecycleEvents.ShouldContain(static item =>
             item.Status == CorrectionPropagationWorkflowStatuses.Started &&
             item.Reason == CorrectionPropagationWorkflowFailureCodes.None);
+    }
+
+    [Fact]
+    public async Task CoordinatorShouldPreserveFailureReportedDuringScheduling()
+    {
+        InMemoryOperationStatusStore store = new();
+        OperationStatusWorkflowStatusSink sink = new(store, new FixedClock());
+        RecordingWorkflowRuntime runtime = new()
+        {
+            OnSchedule = (request, token) => sink.ReportAsync(
+                request, CorrectionPropagationWorkflowStatuses.Failed, 1, null, token),
+        };
+        CorrectionPropagationActivityCatalog catalog = new(
+            CorrectionPropagationStoreKeys.RequiredM0.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5))));
+        DaprCorrectionPropagationCoordinator coordinator = new(runtime, catalog, statusSink: sink);
+        CorrectionPropagationRequest request = Request() with
+        {
+            OperationAcceptedAtUtc = StartedAt,
+            OperationClass = "correction",
+        };
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        await coordinator.StartAsync(request, cancellationToken);
+
+        OperationStatusRecord status = (await store.TryGetAsync(request.TenantId, request.OperationId, cancellationToken))
+            .ShouldNotBeNull();
+        status.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Failed);
+        status.CompletionStatus.ShouldBe(OperationStatusRecord.Failed);
+        status.WorkflowRetryCount.ShouldBe(1);
     }
 
     [Fact]
@@ -418,6 +448,8 @@ public sealed class CorrectionPropagationCoordinatorTests
 
         public Exception? ThrowOnSchedule { get; init; }
 
+        public Func<CorrectionPropagationRequest, CancellationToken, ValueTask>? OnSchedule { get; init; }
+
         public ValueTask ScheduleAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
         {
             if (ThrowOnSchedule is not null)
@@ -426,7 +458,7 @@ public sealed class CorrectionPropagationCoordinatorTests
             }
 
             Scheduled.Add(request);
-            return ValueTask.CompletedTask;
+            return OnSchedule?.Invoke(request, cancellationToken) ?? ValueTask.CompletedTask;
         }
 
         public ValueTask<CorrectionPropagationWorkflowRuntimeStatus> CheckAsync(CancellationToken cancellationToken)

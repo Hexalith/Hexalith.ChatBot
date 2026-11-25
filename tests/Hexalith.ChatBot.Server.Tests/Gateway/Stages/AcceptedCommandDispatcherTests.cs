@@ -12,7 +12,9 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Tests.Observability;
@@ -468,6 +470,56 @@ public sealed partial class AcceptedCommandDispatcherTests
         CorrectionPropagationRequest propagation = coordinator.Requests.ShouldHaveSingleItem();
         propagation.CorrectedProjectId.ShouldBe("project-002");
         propagation.CorrectedCaseId.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CompletionBeforeReceiptWriteShouldSurviveAcceptanceMerge()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        InMemoryOperationStatusStore store = new();
+        FixedClock clock = new();
+        OperationStatusWorkflowStatusSink sink = new(store, clock);
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingCorrectionPropagationCoordinator coordinator = new(async (request, cancellationToken) =>
+        {
+            gateway.Submitted.ShouldHaveSingleItem();
+            (await store.TryGetAsync(Tenant, CommandId, cancellationToken).ConfigureAwait(false)).ShouldBeNull();
+            await sink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Completed, 0, null, cancellationToken)
+                .ConfigureAwait(false);
+        });
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock,
+            correctionPropagation: coordinator);
+        ChatBotGatewayContext context = Context(WireAssociationCorrectionCommand(),
+            commandType: nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation));
+        DateTimeOffset acceptedAt = clock.UtcNow.AddSeconds(-1);
+        string operationClass = CoarseIdempotencyOperationClass.Correction.Code;
+        context.SetPreparedAcceptedAt(acceptedAt);
+        context.SetIdempotency(CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+            operationClass, "coarse", "equivalence", clock.UtcNow.AddMinutes(1)));
+
+        _ = await dispatcher.DispatchAsync(context, token);
+
+        OperationStatusRecord early = (await store.TryGetAsync(Tenant, CommandId, token)).ShouldNotBeNull();
+        early.CompletionStatus.ShouldBe(OperationStatusRecord.Completed);
+        early.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+        early.AcceptedAt.ShouldBe(acceptedAt);
+        early.CorrelationId.ShouldBe(CorrelationId);
+        early.OperationClass.ShouldBe(operationClass);
+
+        OperationStatusRecord receipt = OperationStatusRecord.Accepted(Tenant, new CommandSubmissionResponse
+        {
+            CommandId = CommandId,
+            OperationId = CommandId,
+            CorrelationId = CorrelationId,
+            AcceptedAt = acceptedAt,
+            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
+        }, false, clock.UtcNow.AddSeconds(1), operationClass);
+        await store.UpdateAsync(Tenant, CommandId, current => OperationStatusUpdatePolicy.MergeAcceptance(current, receipt), token);
+        OperationStatusRecord merged = (await store.TryGetAsync(Tenant, CommandId, token)).ShouldNotBeNull();
+        merged.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        merged.CompletionStatus.ShouldBe(OperationStatusRecord.Completed);
+        merged.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
     }
 
     [Fact]
@@ -2599,7 +2651,8 @@ public sealed partial class AcceptedCommandDispatcherTests
             => throw new NotSupportedException();
     }
 
-    private sealed class RecordingCorrectionPropagationCoordinator : ICorrectionPropagationCoordinator
+    private sealed class RecordingCorrectionPropagationCoordinator(
+        Func<CorrectionPropagationRequest, CancellationToken, ValueTask>? onStart = null) : ICorrectionPropagationCoordinator
     {
         public bool IsReady => true;
 
@@ -2608,7 +2661,7 @@ public sealed partial class AcceptedCommandDispatcherTests
         public ValueTask StartAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
         {
             Requests.Add(request);
-            return ValueTask.CompletedTask;
+            return onStart?.Invoke(request, cancellationToken) ?? ValueTask.CompletedTask;
         }
     }
 
