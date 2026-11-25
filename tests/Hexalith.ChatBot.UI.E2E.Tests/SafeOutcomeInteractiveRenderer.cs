@@ -38,6 +38,14 @@ internal sealed class SafeOutcomeInteractiveRenderer(IServiceProvider services, 
             return component;
         });
 
+    /// <summary>Unmounts a root while retaining the renderer's service scope.</summary>
+    internal Task UnmountAsync(IComponent component)
+        => Dispatcher.InvokeAsync(() =>
+        {
+            RemoveRootComponent(_componentIds[component]);
+            _componentIds.Remove(component);
+        });
+
     /// <summary>Updates root parameters and completes the actual after-render lifecycle.</summary>
     /// <param name="component">The mounted root.</param>
     /// <param name="parameters">The next root parameters.</param>

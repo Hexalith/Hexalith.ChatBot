@@ -66,6 +66,7 @@ _ = builder.Services.AddSingleton(provider =>
 _ = builder.Services.AddScoped<GovernedOperationService>();
 _ = builder.Services.AddScoped<OperationalDashboardService>();
 _ = builder.Services.AddScoped<AssociationReviewService>();
+_ = builder.Services.AddScoped<AssociationReviewFocusState>();
 _ = builder.Services.AddScoped<ComplianceAuditService>();
 _ = builder.Services.AddScoped<ProjectConversationService>();
 _ = builder.Services.AddScoped<ChatBotAnnouncementDeduplicationState>();

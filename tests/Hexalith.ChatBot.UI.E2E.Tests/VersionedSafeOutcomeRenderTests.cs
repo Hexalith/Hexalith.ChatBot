@@ -1150,6 +1150,7 @@ public sealed class VersionedSafeOutcomeRenderTests
             services.AddSingleton<ChatBotUiTextLocalizer>();
             services.AddSingleton<ChatBotCultureFormatter>();
             services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            services.AddScoped<AssociationReviewFocusState>();
             ServiceProvider provider = services.BuildServiceProvider();
             await using (provider.ConfigureAwait(true))
             {

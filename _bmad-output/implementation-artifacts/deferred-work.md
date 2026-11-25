@@ -2347,6 +2347,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: Returning to the association review page with an already-announced failure moves focus to the error summary again, although the banner stays silent.
   evidence: Low, pre-existing. `_announcedFailure`, formerly `_announcedErrorCode`, belongs to the component instance and starts empty on every remount. Fix by seeding it from the current state on first render or keeping it in circuit-scoped state.
+  resolution: Resolved 2026-11-25. The circuit remembers which failure activation took focus. Unmounting and remounting in that scope retains focus for the old failure, and the next activation receives focus once. The interactive and static rendering suites passed all 111 cases.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
   summary: A validation code shown after an association-review failure can send focus to the removed failure-summary element.

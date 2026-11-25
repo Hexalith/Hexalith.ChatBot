@@ -7,6 +7,7 @@
 @inject IDispatcher Dispatcher
 @inject ChatBotUiTextLocalizer UiText
 @inject ChatBotCultureFormatter Formatter
+@inject AssociationReviewFocusState FailureFocus
 
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
                           MainLabel="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]"
@@ -259,7 +260,6 @@
     private AssociationReviewModel? Review => State.Value.Review;
 
     private ElementReference? _errorSummary;
-    private (string? Code, long Activation) _announcedFailure;
 
     private bool CanReadEvidence => Review?.AssociationId == AssociationId && !State.Value.IsLoading
         && State.Value.ErrorScope is not AssociationReviewErrorScope.Load;
@@ -296,14 +296,10 @@
         }
 
         AssociationReviewState state = State.Value;
-        if (state.ErrorCode is { Length: > 0 } code && _errorSummary is { } summary)
+        if (state.ErrorCode is { Length: > 0 } && _errorSummary is { } summary &&
+            FailureFocus.TryClaimFocus(state.FailureActivation))
         {
-            var current = (code, state.FailureActivation);
-            if (current != _announcedFailure)
-            {
-                _announcedFailure = current;
-                await summary.FocusAsync().ConfigureAwait(true);
-            }
+            await summary.FocusAsync().ConfigureAwait(true);
         }
     }
 

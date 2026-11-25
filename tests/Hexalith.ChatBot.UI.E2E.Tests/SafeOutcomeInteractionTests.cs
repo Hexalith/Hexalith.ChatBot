@@ -208,9 +208,16 @@ public sealed class SafeOutcomeInteractionTests
                     AssociationReviewReducers.ReduceLoad(state.Value, retry), new(Failure))).ConfigureAwait(true);
                 await ShouldAnnounceAndFocusOnceAsync(3).ConfigureAwait(true);
 
-                // Returning to the page does not announce the failure the reviewer already heard.
+                // Returning to the page leaves the existing focus and announcement alone.
+                await renderer.UnmountAsync(page).ConfigureAwait(true);
                 page = await renderer.MountAsync<AssociationReview>(route).ConfigureAwait(true);
                 renderer.Attribute(Banners().ShouldHaveSingleItem(), "aria-live").ShouldBe("off");
+                js.FocusedElements.Count.ShouldBe(3);
+
+                retry = await RetryAsync().ConfigureAwait(true);
+                await RenderAsync(AssociationReviewReducers.ReduceFailed(
+                    AssociationReviewReducers.ReduceLoad(state.Value, retry), new(Failure))).ConfigureAwait(true);
+                await ShouldAnnounceAndFocusOnceAsync(4).ConfigureAwait(true);
             }).ConfigureAwait(true);
         }, associationState: state, jsRuntime: js);
     }
@@ -388,9 +395,13 @@ public sealed class SafeOutcomeInteractionTests
             services.AddSingleton<ChatBotUiTextLocalizer>();
             services.AddSingleton<ChatBotCultureFormatter>();
             services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            services.AddScoped<AssociationReviewFocusState>();
             ServiceProvider provider = services.BuildServiceProvider();
             await using var providerLifetime = provider.ConfigureAwait(true);
-            SafeOutcomeInteractiveRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+            AsyncServiceScope scope = provider.CreateAsyncScope();
+            await using var scopeLifetime = scope.ConfigureAwait(true);
+            IServiceProvider scopedServices = scope.ServiceProvider;
+            SafeOutcomeInteractiveRenderer renderer = new(scopedServices, scopedServices.GetRequiredService<ILoggerFactory>());
             await using var rendererLifetime = renderer.ConfigureAwait(true);
             await test(renderer, dispatcher).ConfigureAwait(true);
         }
