@@ -19,7 +19,23 @@ if [[ -z "${HexalithBuildsPublishedToolRoot:-}" ]]; then
 fi
 export HexalithBuildsPublishedToolRoot
 
-for project in "$@"; do
+# The story-evidence gate run step invokes the native xUnit v4 host from
+# tests/.../bin/Release/net11.0. Building only the gate tool or IntegrationTests
+# leaves that host missing, so include the test project whenever it exists.
+story_evidence_tests="tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj"
+projects=("$@")
+already_listed=0
+for project in "${projects[@]}"; do
+    if [[ "$project" == "$story_evidence_tests" ]]; then
+        already_listed=1
+        break
+    fi
+done
+if (( already_listed == 0 )) && [[ -f "$story_evidence_tests" ]]; then
+    projects+=("$story_evidence_tests")
+fi
+
+for project in "${projects[@]}"; do
     if [[ ! -f "$project" ]]; then
         printf 'Project %s does not exist.\n' "$project" >&2
         exit 1

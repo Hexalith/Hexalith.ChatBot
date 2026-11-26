@@ -26,6 +26,9 @@
     <Project Path="src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj" />
     <Project Path="src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj" />
@@ -34,6 +37,7 @@
     <Project Path="tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Live.IntegrationTests/Hexalith.ChatBot.Live.IntegrationTests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Recovery.Tests/Hexalith.ChatBot.Recovery.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Release.Tests/Hexalith.ChatBot.Release.Tests.csproj" />

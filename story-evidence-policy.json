@@ -1,0 +1,223 @@
+{
+  "schemaVersion": "2.1",
+  "minimumSupportedVersion": "2.1",
+  "repositoryIdentity": "Hexalith/Hexalith.ChatBot",
+  "maximumCurrentRunAgeMinutes": 60,
+  "maximumLaneCurrentRunAgeMinutes": 1440,
+  "maximumRetainedEvidenceAgeHours": 720,
+  "maximumFutureClockSkewMinutes": 5,
+  "allowedScopeModes": [
+    "diff",
+    "snapshot-plus-transition"
+  ],
+  "acceptedResultFormats": [
+    "trx"
+  ],
+  "requiredStorySections": [
+    "Tasks & Acceptance",
+    "Acceptance Criteria",
+    "Tasks / Subtasks",
+    "File List"
+  ],
+  "mandatoryCheckboxSections": [
+    "Execution",
+    "Tasks / Subtasks"
+  ],
+  "storyGrammars": [
+    {
+      "name": "te-spec",
+      "titleSource": "frontmatter:title",
+      "statusSource": "frontmatter:status",
+      "tasksSection": "## Tasks & Acceptance / **Execution:**",
+      "acceptanceSection": "## Tasks & Acceptance / **Acceptance Criteria:**",
+      "fileListSection": "## File List"
+    },
+    {
+      "name": "bmad-product-story",
+      "titleSource": "# Story ...",
+      "statusSource": "Status: ...",
+      "tasksSection": "## Tasks / Subtasks",
+      "acceptanceSection": "## Acceptance Criteria",
+      "fileListSection": "### File List"
+    }
+  ],
+  "eventBaseHeadResolution": {
+    "schemaVersion": "1.0",
+    "pullRequestBase": "github.event.pull_request.base.sha",
+    "pullRequestHead": "github.event.pull_request.head.sha",
+    "pushBase": "github.event.before",
+    "pushHead": "github.sha",
+    "zeroPushBaseFallback": "git rev-parse HEAD^",
+    "unavailableNonZeroPushBase": "fail",
+    "nonPushEventRange": "github.sha..github.sha"
+  },
+  "sourceDigest": {
+    "algorithm": "SHA-256",
+    "tuple": "repository/path/mode/blob",
+    "sort": "ordinal",
+    "rootDeclaredSubmodulesOnly": true,
+    "immutableContentSource": "git-tree",
+    "worktreeModeSource": "git-index",
+    "symlinkMode": "120000"
+  },
+  "reasonCodes": [
+    "status_mismatch",
+    "file_list_diff_mismatch",
+    "gitlink_scope_mismatch",
+    "scope_digest_mismatch",
+    "machine_results_invalid",
+    "evidence_stale_or_unbound",
+    "primary_path_not_executed",
+    "checked_item_evidence_mismatch",
+    "evidence_payload_forbidden"
+  ],
+  "primaryPathTriggers": [
+    {
+      "class": "browser",
+      "pathPatterns": [
+        "src/**/*.razor",
+        "src/**/wwwroot/**",
+        "tests/**/*E2E*"
+      ],
+      "claimPatterns": [
+        "[claim:browser]"
+      ],
+      "recognizedLanes": [
+        "browser-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "browser-primary",
+          "maximumCurrentRunAgeMinutes": 360,
+          "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "signalr",
+      "pathPatterns": [
+        "src/**/*Hub*.cs",
+        "src/**/*SignalR*.cs",
+        "tests/**/*SignalR*.cs"
+      ],
+      "claimPatterns": [
+        "[claim:signalr]"
+      ],
+      "recognizedLanes": [
+        "signalr-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "signalr-primary",
+          "maximumCurrentRunAgeMinutes": 360,
+          "selector": "class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "hosting-assets",
+      "pathPatterns": [
+        "src/**/*AppHost*",
+        "src/**/wwwroot/**",
+        "src/**/*.css",
+        "src/**/App.razor"
+      ],
+      "claimPatterns": [
+        "[claim:hosting-assets]"
+      ],
+      "recognizedLanes": [
+        "hosting-assets-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "hosting-assets-primary",
+          "maximumCurrentRunAgeMinutes": 360,
+          "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "aspire-dapr",
+      "pathPatterns": [
+        "src/Hexalith.ChatBot.AppHost/**",
+        "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs"
+      ],
+      "claimPatterns": [
+        "[claim:aspire-dapr]"
+      ],
+      "recognizedLanes": [
+        "aspire-dapr-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "aspire-dapr-primary",
+          "maximumCurrentRunAgeMinutes": 360,
+          "selector": "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "recovery",
+      "pathPatterns": [
+        "tests/**/Recovery/**",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml"
+      ],
+      "claimPatterns": [
+        "[claim:recovery]"
+      ],
+      "recognizedLanes": [
+        "recovery-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "recovery-primary",
+          "maximumCurrentRunAgeMinutes": 360,
+          "selector": "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
+          "trx": "recovery-primary/live-recovery-validation.trx",
+          "provenance": "recovery-primary/live-recovery-validation.provenance.json",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadataOnly": {
+    "forbiddenFieldNames": [
+      "secret",
+      "password",
+      "credential",
+      "token",
+      "payload",
+      "prompt"
+    ],
+    "allowedArtifactFields": [
+      "artifactLocator",
+      "trxSha256",
+      "implementationDigest"
+    ],
+    "allowedLocatorSchemes": [
+      "file",
+      "github-actions"
+    ],
+    "maximumStringLength": 512,
+    "redactedFailureSubject": "redacted"
+  },
+  "reportExcludedPaths": [
+    "_bmad-output/implementation-artifacts/evidence/reports/"
+  ],
+  "exceptions": []
+}

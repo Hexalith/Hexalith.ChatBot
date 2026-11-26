@@ -514,7 +514,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Build Release configuration
-        run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+        run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
