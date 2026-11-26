@@ -97,6 +97,27 @@ public static class AppHostTopologyTests
     }
 
     /// <summary>
+    /// Binding Memories <c>APP_API_TOKEN</c> must not collapse the public isolation probe to 401. The probe
+    /// presents that token so JWT tenant authorization can still fail closed with Forbidden.
+    /// </summary>
+    [Fact]
+    public static void MemoriesIsolationProbeShouldPresentTheAppChannelTokenBeforeForbidden()
+    {
+        string probe = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "TrivialGovernedCommandAspireE2eTests.cs"));
+        probe.ShouldContain("ResolveMemoriesAppChannelTokenAsync");
+        probe.ShouldContain("dapr-api-token");
+        probe.ShouldContain("forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden)");
+        probe.ShouldNotContain("Hexalith:Dapr:ApplicationTokenOverride");
+        probe.ShouldNotContain("Hexalith__Dapr__ApplicationTokenOverride");
+        probe.IndexOf("dapr-api-token", StringComparison.Ordinal)
+            .ShouldBeLessThan(probe.IndexOf("forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden)", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// The association subscription and SDK <c>/process</c>/<c>/query</c> routes verify the sidecar's
     /// <c>dapr-api-token</c> against the app's <c>APP_API_TOKEN</c>. The topology must give both the same token
     /// after the sidecar exists.

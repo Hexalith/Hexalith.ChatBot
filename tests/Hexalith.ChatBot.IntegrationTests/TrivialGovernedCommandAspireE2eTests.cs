@@ -2732,11 +2732,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         memories.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
             // The public probe JWT is symmetric. Leave Authentication:WorkloadJwtBearer on the AppHost
-            // Development HMAC contract so Memories can Sign() bound EventStore assertions.
+            // Development HMAC contract so Memories can Sign() bound EventStore assertions. Do not clear
+            // APP_API_TOKEN: the generated app-channel token is the sidecar-to-app gate, not a JWT substitute.
             context.EnvironmentVariables["Authentication__JwtBearer__Authority"] = string.Empty;
             context.EnvironmentVariables["Authentication__JwtBearer__Issuer"] = MemoriesProbeIssuer;
             context.EnvironmentVariables["Authentication__JwtBearer__Audience"] = MemoriesProbeAudience;
             context.EnvironmentVariables["Authentication__JwtBearer__SigningKey"] = MemoriesProbeSigningKey;
+            context.EnvironmentVariables["Authentication__JwtBearer__RequireHttpsMetadata"] = "false";
             context.EnvironmentVariables["Authentication__JwtBearer__ValidAlgorithms__0"] = "HS256";
         }));
         // Live topology uses Keycloak owner client credentials. Overlaying ChatBot__Memories__ApiToken
@@ -2766,12 +2768,52 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         return $"{unsignedToken}.{Encode(signature)}";
     }
 
+    private static async Task<string> ResolveMemoriesAppChannelTokenAsync(
+        DistributedApplication app,
+        CancellationToken cancellationToken)
+    {
+        DistributedApplicationModel model = app.Services.GetRequiredService<DistributedApplicationModel>();
+        IResource memories = model.Resources.Single(resource => resource.Name == MemoriesResourceName);
+        Dictionary<string, object> environment = new(StringComparer.Ordinal);
+        EnvironmentCallbackContext context = new(
+            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run),
+            memories,
+            environment,
+            cancellationToken);
+        foreach (EnvironmentCallbackAnnotation annotation in memories.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await annotation.Callback(context).ConfigureAwait(true);
+        }
+
+        environment.TryGetValue("APP_API_TOKEN", out object? value).ShouldBeTrue(
+            "Memories must expose the generated app-channel token.");
+        string? token = value switch
+        {
+            string text => text,
+            IValueProvider provider => await provider.GetValueAsync(cancellationToken).ConfigureAwait(true),
+            _ => value?.ToString(),
+        };
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException("Memories APP_API_TOKEN resolved empty.");
+        }
+
+        return token;
+    }
+
     private async Task ProvisionMemoriesProbeTenantsAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
         MemoriesProbeCommandGateway gateway = app.Services.GetRequiredService<MemoriesProbeCommandGateway>();
         await gateway.ConnectAsync(app, cancellationToken).ConfigureAwait(true);
         using HttpClient client = app.CreateHttpClient(MemoriesResourceName, "http");
         client.Timeout = TimeSpan.FromSeconds(30);
+        // Direct HTTP to Memories does not pass through its sidecar. After the AppHost bound APP_API_TOKEN,
+        // the app-channel middleware 401s before JWT tenant authorization. Present the generated token so
+        // missing JWT stays Unauthorized and an authenticated outside-tenant call can fail closed Forbidden.
+        string appChannelToken = await ResolveMemoriesAppChannelTokenAsync(app, cancellationToken).ConfigureAwait(true);
+        client.DefaultRequestHeaders.Remove("dapr-api-token");
+        client.DefaultRequestHeaders.TryAddWithoutValidation("dapr-api-token", appChannelToken).ShouldBeTrue(
+            "The Memories isolation probe must present the app-channel token.");
         await WaitForListenerAsync(client, cancellationToken).ConfigureAwait(true);
         using (HttpResponseMessage unauthenticated = await client.GetAsync(
             "/api/v1/tenants/tenant-alpha", cancellationToken).ConfigureAwait(true))
