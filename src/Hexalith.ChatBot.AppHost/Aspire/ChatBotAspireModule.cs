@@ -59,6 +59,12 @@ internal static class ChatBotAspireModule
     public const string PartiesAppId = "parties";
     public const string ProjectsAppId = "projects";
 
+    /// <summary>
+    /// Development issuer for bound EventStore workload assertions. This umbrella's Keycloak import has no
+    /// authorization_details profile, so domain services Sign() HS256 assertions with the shared local key.
+    /// </summary>
+    public const string LocalWorkloadJwtIssuer = "hexalith-chatbot-local-workload";
+
     public static string GetTenantDeadLetterTopic(string tenantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
@@ -454,5 +460,35 @@ internal static class ChatBotAspireModule
             .WithExternalHttpEndpoints()
             .WithDaprSidecar(sidecar => sidecar
                 .WithOptions(SidecarOptions(builder, EventStoreAdminUiAppId, daprConfigPath)));
+    }
+
+    /// <summary>
+    /// Configures the dedicated workload JWT contract for Development symmetric signing. User-facing
+    /// <c>Authentication:JwtBearer</c> stays on Keycloak.
+    /// </summary>
+    /// <param name="resource">The spine resource that issues or validates EventStore workload assertions.</param>
+    /// <param name="signingKey">The shared secret HS256 key; it must be a secret parameter.</param>
+    /// <param name="audience">The dedicated contract audience used to validate the issuer settings.</param>
+    /// <returns>The resource builder.</returns>
+    public static IResourceBuilder<TResource> WithLocalWorkloadJwtBearer<TResource>(
+        this IResourceBuilder<TResource> resource,
+        IResourceBuilder<ParameterResource> signingKey,
+        string audience)
+        where TResource : IResourceWithEnvironment
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentNullException.ThrowIfNull(signingKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(audience);
+        if (!signingKey.Resource.Secret)
+        {
+            throw new ArgumentException("The local workload JWT signing key must be a secret parameter.", nameof(signingKey));
+        }
+
+        return resource
+            .WithEnvironment("Authentication__WorkloadJwtBearer__Issuer", LocalWorkloadJwtIssuer)
+            .WithEnvironment("Authentication__WorkloadJwtBearer__Audience", audience.Trim())
+            .WithEnvironment("Authentication__WorkloadJwtBearer__AllowedAlgorithms__0", "HS256")
+            .WithEnvironment("Authentication__WorkloadJwtBearer__RequireHttpsMetadata", "false")
+            .WithEnvironment("Authentication__WorkloadJwtBearer__SigningKey", signingKey);
     }
 }

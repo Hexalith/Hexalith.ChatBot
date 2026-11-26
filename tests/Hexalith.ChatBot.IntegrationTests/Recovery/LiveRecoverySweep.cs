@@ -1168,3 +1168,31 @@ internal sealed class LiveRecoverySweep
         return directory?.FullName ?? throw new InvalidOperationException("Could not locate repository root.");
     }
 }
+
+/// <summary>
+/// CiCd-owned CI recovery filter this type name (E2e) on the IntegrationTests runner.
+/// Keep it in this file: a second path that differs only by case is NETSDK1022.
+/// </summary>
+[Trait("Category", "E2E")]
+[Collection(RealmTemplateMutationCollection.Name)]
+public sealed class LiveContinuityAspireE2eTests
+{
+    /// <summary>Required CI live-recovery: continuity, projection-rebuild, and scoped-outage coordinators.</summary>
+    [Fact]
+    public Task LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate()
+        => new LiveRecoverySweep().RunAsync();
+}
+
+/// <summary>
+/// CiCd-owned release/scheduled recovery filters this type name (E2E, not E2e) on the IntegrationTests runner.
+/// Keep it in this file: a second path that differs only by case is NETSDK1022.
+/// </summary>
+[Trait("Category", "E2E")]
+[Collection(RealmTemplateMutationCollection.Name)]
+public sealed class LiveContinuityAspireE2ETests
+{
+    /// <summary>Required release live-recovery: continuity, projection-rebuild, and scoped-outage coordinators.</summary>
+    [Fact]
+    public Task LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate()
+        => new LiveRecoverySweep().RunAsync();
+}

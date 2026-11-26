@@ -38,6 +38,8 @@ public static class AppHostTopologyTests
         module.ShouldContain("PubSubTopicName = \"chatbot.events\"");
         module.ShouldContain("DeadLetterTopicName = \"deadletter.chatbot.events\"");
         module.ShouldContain("ChatBotUiAppId = \"chatbot-ui\"");
+        module.ShouldContain("LocalWorkloadJwtIssuer = \"hexalith-chatbot-local-workload\"");
+        module.ShouldContain("WithLocalWorkloadJwtBearer");
     }
 
     [Fact]
@@ -85,6 +87,9 @@ public static class AppHostTopologyTests
         source.ShouldContain("\"memories-api-token\"");
         source.ShouldContain("ChatBot__Memories__ApiToken\", builder.AddParameter(\"memories-api-token\", () => memoriesApiToken, publishValueAsDefault: false, secret: true)");
         source.ShouldContain("WithPlatformOwnerService(\"ChatBot:Memories\", memoriesHttp, security, memoriesOwner)");
+        source.ShouldContain("WithLocalWorkloadJwtBearer(");
+        source.ShouldContain("Authentication__WorkloadIssuer__Workload\", \"memories\"");
+        source.ShouldContain("_ = memories.Server.WithGeneratedEventStoreAppChannelToken();");
         string platform = File.ReadAllText(Path.Combine(RepositoryRoot(), "references", "Hexalith.Platform", "src", "Hexalith.Platform.Composition", "PlatformOwnerServices.cs"));
         platform.ShouldContain("publishValueAsDefault: false, secret: true");
         platform.ShouldContain("__OwnerAuthentication__ClientSecret\", binding.SecretParameter");

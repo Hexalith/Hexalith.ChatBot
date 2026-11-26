@@ -73,6 +73,11 @@ IResourceBuilder<ParameterResource> memoriesCommandPrivateKeyParameter = builder
     "memories-command-private-key", () => memoriesCommandPrivateKey, secret: true);
 IResourceBuilder<ParameterResource> memoriesCommandPublicKeyParameter = builder.AddParameter(
     "memories-command-public-key", () => memoriesCommandPublicKey, secret: true);
+string localWorkloadJwtSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+IResourceBuilder<ParameterResource> localWorkloadJwtSigningKeyParameter = builder.AddParameter(
+    "local-workload-jwt-signing-key",
+    () => localWorkloadJwtSigningKey,
+    secret: true);
 IResourceBuilder<ParameterResource> chatBotAuthorityReaderSecretParameter = builder.AddParameter(
     "chatbot-authority-reader-secret",
     () => chatBotAuthorityReaderSecret,
@@ -246,6 +251,7 @@ if (builder.ExecutionContext.IsRunMode)
     _ = parties.WithGeneratedEventStoreAppChannelToken();
     _ = projects.WithGeneratedEventStoreAppChannelToken();
     _ = chatBot.WithGeneratedEventStoreAppChannelToken();
+    _ = memories.Server.WithGeneratedEventStoreAppChannelToken();
 }
 
 // The minimal UI core-operations surface joins the topology and reaches the ChatBot server over HTTP via
@@ -289,7 +295,9 @@ if (security is not null)
             .WithEnvironment("Authentication__JwtBearer__ValidAlgorithms__0", "RS256");
     }
     _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
-    _ = eventStore.WithEventStoreWorkloadClientCredentials("eventstore", eventStoreWorkloadClientSecretParameter);
+    _ = eventStore.WithEventStoreWorkloadClientCredentials("eventstore", eventStoreWorkloadClientSecretParameter)
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", ChatBotAspireModule.EventStoreServiceName)
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName);
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__PublicKeys__chatbot", authorityReadPublicKeyParameter);
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__chatbot", "chatbot")
         .WithEnvironment("Authentication__BoundCommand__AllowedDomains__chatbot", "chatbot")
@@ -315,6 +323,7 @@ if (security is not null)
         .WithEnvironment("Authentication__WorkloadIssuer__Workload", "tenants")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("tenants", tenantsAuthorityReaderSecretParameter)
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", tenantsAuthorityReadPrivateKeyParameter);
     if (prepareDevelopmentCatalogOwners)
     {
@@ -337,6 +346,7 @@ if (security is not null)
         .WithEnvironment("Authentication__WorkloadIssuer__Workload", "parties")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("parties", partiesAuthorityReaderSecretParameter)
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", partiesAuthorityReadPrivateKeyParameter);
     _ = projects.WithJwtBearerSecurity(security, "hexalith-eventstore")
         .WithEnvironment("Authentication__JwtBearer__AllowAnonymousDevelopment", "false")
@@ -345,6 +355,7 @@ if (security is not null)
         .WithEnvironment("Authentication__WorkloadIssuer__Workload", "projects")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("projects", projectsAuthorityReaderSecretParameter)
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", projectsAuthorityReadPrivateKeyParameter);
     _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot")
         .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", ChatBotAspireModule.AppId)
@@ -353,8 +364,11 @@ if (security is not null)
         .WithEnvironment("Authentication__WorkloadIssuer__Workload", ChatBotAspireModule.AppId)
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore");
     _ = chatBot.WithEventStoreWorkloadClientCredentials("chatbot", chatBotAuthorityReaderSecretParameter)
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", authorityReadPrivateKeyParameter);
     _ = memories.Server.WithEventStoreWorkloadClientCredentials("memories", memoriesWorkloadClientSecretParameter)
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", "memories")
+        .WithLocalWorkloadJwtBearer(localWorkloadJwtSigningKeyParameter, ChatBotAspireModule.EventStoreServiceName)
         .WithEnvironment("EventStore__CommandGateway__BoundCommand__PrivateKeyPkcs8Base64", memoriesCommandPrivateKeyParameter);
     _ = chatBotUi
         .WithSecurityDependency(security)

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Hexalith.ChatBot.AppHost.Aspire;
 using Hexalith.ChatBot.IntegrationTests.Recovery;
 using Shouldly;
 
@@ -92,6 +93,13 @@ public sealed class OwnerServiceTopologyTests
             receiver["Authentication__JwtBearer__SigningKey"].ShouldBe("");
             receiver["Authentication__JwtBearer__RequireHttpsMetadata"].ShouldBe("false");
             receiver["Authentication__JwtBearer__ValidAlgorithms__0"].ShouldBe("RS256");
+            receiver["Authentication__WorkloadIssuer__Workload"].ShouldBe("memories");
+            receiver["Authentication__WorkloadJwtBearer__Issuer"].ShouldBe(ChatBotAspireModule.LocalWorkloadJwtIssuer);
+            receiver["Authentication__WorkloadJwtBearer__Audience"].ShouldBe(ChatBotAspireModule.EventStoreServiceName);
+            receiver["Authentication__WorkloadJwtBearer__AllowedAlgorithms__0"].ShouldBe("HS256");
+            receiver["Authentication__WorkloadJwtBearer__RequireHttpsMetadata"].ShouldBe("false");
+            ParameterResource workloadSigningKey = receiver["Authentication__WorkloadJwtBearer__SigningKey"].ShouldBeOfType<ParameterResource>();
+            workloadSigningKey.Secret.ShouldBeTrue();
         }
         finally
         {
