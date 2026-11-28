@@ -2391,3 +2391,13 @@ archived: 2026-11-24
   summary: A validation code shown after an association-review failure can send focus to the removed failure-summary element.
   evidence: Unverified medium, pre-existing. The focus guard reads `ValidationErrorCode ?? ErrorCode` and focuses `_errorSummary`, which only renders while `ErrorCode` is set. The validation banner in `ChatBotAssociationReviewActions.razor` has no focus target of its own. Settle with a browser test that fails, then validates on the same page.
   resolution: Resolved 2026-11-25. The page-level focus target is limited to the mounted failure summary. The interactive renderer verified that a subsequent validation rejection renders inline without moving focus. Both focused interaction tests passed.
+
+
+## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-28)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: `AcceptedCommandDispatcher` omits `AuthorityKey` validation on `GrantChatBotAuthority`/`RevokeChatBotAuthority` and throws `InvalidOperationException` on disallowed `ExecuteApprovedAIAction`, surfacing permanent validation/allowlist rejections as retryable `503 DispatchUnavailable` with `PreCommitOperationReplay` intents and false `AuditUnavailable` alerts (`src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs:180-190, 730-733`).
+  evidence: R23-W1 (`medium`, `blind-hunter`). Verified in `AcceptedCommandDispatcher.cs`: lines 180-190 pass `AuthorityKey` unchecked (failing in `BindDispatchTargetAsync` -> `CommandNotSubmittedException`), and line 732 throws `InvalidOperationException` when `!allowlist.IsAllowed(...)`. Pre-existing/non-Story-1.5 command-plan validation outside Story 1.5's operation-identity/concurrency scope.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: `ChatBotApplicationBoundaryResultHandler` audits authorization failures and increments `IAuthorizationFailureCounter` only on `POST /api/v1/commands`, skipping all other `ChatBotApplicationBoundaryPolicy` routes (`src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs:60-111`).
+  evidence: R23-W2 (`medium`, `blind-hunter`, from `R23-D3`). Reason (human decision 2026-11-28): Keep Story 1.5 scoped to `POST /api/v1/commands` (R12-W1 command-admission scope); defer non-command `ChatBotApplicationBoundaryPolicy` route denial auditing and spike-counting to Epic 7/8/13.
