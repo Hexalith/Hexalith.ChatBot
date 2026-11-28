@@ -1,0 +1,25 @@
+{
+  "branches": [
+    "main",
+    "next",
+    { "name": "alpha", "prerelease": true },
+    { "name": "beta", "prerelease": true }
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "bash .github/scripts/pack-release-packages.sh ./nupkgs ${nextRelease.version}",
+        "publishCmd": "bash .github/scripts/publish-release-packages.sh ./nupkgs"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": ["nupkgs/*.nupkg", "nupkgs/*.snupkg"]
+      }
+    ]
+  ]
+}

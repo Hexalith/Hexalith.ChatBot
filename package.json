@@ -1,0 +1,23 @@
+{
+  "name": "hexalith-chatbot",
+  "private": true,
+  "engines": {
+    "node": ">=24.10.0"
+  },
+  "scripts": {
+    "commitlint": "commitlint --config commitlint.config.cjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/exec": "7.1.0",
+    "@semantic-release/github": "12.0.10",
+    "@semantic-release/release-notes-generator": "14.1.1",
+    "semantic-release": "25.0.9"
+  },
+  "overrides": {
+    "semantic-release": {
+      "@semantic-release/npm": "npm:@semantic-release/error@4.0.0"
+    }
+  }
+}
