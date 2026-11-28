@@ -6,7 +6,7 @@
           BeforeTargets="_GetAllRestoreProjectPathItems;_GenerateRestoreProjectPathWalk"
           Condition="'$(UseHexalithProjectReferences)' != 'true'">
     <PropertyGroup>
-      <_GenerateRestoreGraphProjectEntryInputProperties>$(_GenerateRestoreGraphProjectEntryInputProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false</_GenerateRestoreGraphProjectEntryInputProperties>
+      <_GenerateRestoreGraphProjectEntryInputProperties>$(_GenerateRestoreGraphProjectEntryInputProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);Hexalith1BuildPackageProps=$(_ChatBotCatalogPackageProps);Hexalith2BuildPackageProps=$(_ChatBotCatalogPackageProps);ShouldUnsetParentConfigurationAndPlatform=false</_GenerateRestoreGraphProjectEntryInputProperties>
     </PropertyGroup>
   </Target>
 </Project>

@@ -71,11 +71,14 @@ process.stdout.write(executable);
     if not (Path(tool_root) / "Hexalith.Builds.Tooling.dll").is_file():
         raise FileNotFoundError("The manifest-pinned published composition tool was not restored")
 
+    catalog_props = str(Path("references/Hexalith.Builds/Props/Directory.Packages.props").resolve())
     settings = {
         "HEXALITH_CHATBOT_TIER3": "1",
         "HEXALITH_CHATBOT_TIER3_REQUIRED": "1",
         "CHROME_EXECUTABLE_PATH": browser,
         "HexalithBuildsPublishedToolRoot": tool_root,
+        "Hexalith1BuildPackageProps": catalog_props,
+        "Hexalith2BuildPackageProps": catalog_props,
         "Configuration": "Release",
         "UseHexalithProjectReferences": "false",
         "HexalithEventStoreFromSource": "false",

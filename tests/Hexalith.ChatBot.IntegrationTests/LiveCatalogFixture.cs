@@ -187,11 +187,11 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
         {
             ("tenants", "Hexalith.Tenants.Contracts.dll", "Hexalith.Tenants.Server.dll"),
             ("parties", "Hexalith.Parties.Contracts.dll", "Hexalith.Parties.EventStoreExtensions.dll"),
-            ("projects", (string?)null, (string?)null),
+            ("projects", "Hexalith.Projects.Contracts.dll", "Hexalith.Projects.EventStoreExtensions.dll"),
             ("chatbot", (string?)null, (string?)null),
         })
         {
-            // Tenants and Parties enroll their declarations/adapters in separate real runtime
+            // Tenants, Parties, and Projects enroll their declarations/adapters in separate real runtime
             // dependencies. The public split-artifact overload verifies both against this child.
             // ChatBot keeps declarations and adapters on the same compiled server image.
             _owners.Add(declarations is null
@@ -224,7 +224,7 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
             ]) { TechnicalHttp = true },
             new(tenants, DomainCalls("process", "replay-state", "query", "project", "admin/operational-index-metadata")),
             new(parties, DomainCalls("process", "replay-state", "query", "project", "admin/operational-index-metadata")),
-            new(projects, DomainCalls("process", "query", "project", "project/v2", "project/rebuild/v1", "admin/operational-index-metadata")),
+            new(projects, DomainCalls("process", "replay-state", "query", "project", "project/v2", "project/v2/reconcile", "project/rebuild/v1", "project/rebuild/part/v1", "admin/operational-index-metadata")),
             new(chatbot, EventStoreDomainServiceRoutes.Operational
                 .Select(route => new DevelopmentRouteCatalogInvocation(gateway, route.Route.Trim('/'), ["POST"]))
                 .ToArray()),

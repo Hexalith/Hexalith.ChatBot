@@ -3,16 +3,19 @@
   <!-- NuGet adds transitive project edges without the AppHost edge metadata. Bind both
        explicit and generated edges so every composition build uses Release and the same
        manifest-pinned published Tooling assembly, including integration/recovery consumers. -->
+  <PropertyGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <_ChatBotCatalogPackageProps Condition="'$(_ChatBotCatalogPackageProps)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)references/Hexalith.Builds/Props/Directory.Packages.props'))</_ChatBotCatalogPackageProps>
+  </PropertyGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
     <ProjectReference Update="@(ProjectReference)"
-                      AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false" />
+                      AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);Hexalith1BuildPackageProps=$(_ChatBotCatalogPackageProps);Hexalith2BuildPackageProps=$(_ChatBotCatalogPackageProps);ShouldUnsetParentConfigurationAndPlatform=false" />
   </ItemGroup>
   <Target Name="PreserveChatBotCompositionInputs"
           AfterTargets="IncludeTransitiveProjectReferences"
           Condition="'$(UseHexalithProjectReferences)' != 'true'">
     <ItemGroup>
       <ProjectReference Update="@(ProjectReference)"
-                        AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false" />
+                        AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);Hexalith1BuildPackageProps=$(_ChatBotCatalogPackageProps);Hexalith2BuildPackageProps=$(_ChatBotCatalogPackageProps);ShouldUnsetParentConfigurationAndPlatform=false" />
     </ItemGroup>
   </Target>
 
