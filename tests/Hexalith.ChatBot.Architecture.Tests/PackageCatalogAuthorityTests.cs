@@ -48,7 +48,7 @@ public static class PackageCatalogAuthorityTests
                 .ToArray();
 
             contracts.Length.ShouldBe(1);
-            contracts[0].GetProperty("Version").GetString().ShouldBe(includeContract ? "9.9.9" : "1.0.2");
+            contracts[0].GetProperty("Version").GetString().ShouldBe(includeContract ? "9.9.9" : "2.0.0");
             contracts[0].GetProperty("DefiningProjectFullPath").GetString()
                 .ShouldBe(includeContract ? catalogPath : wrapperPath);
         }
